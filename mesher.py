@@ -173,7 +173,104 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
     - bottom_faces: List of lists containing indices of points for each face.
     """
 
-    pass    
+    row_lengths = [0]
+    current_num_points = len(points[0])
+    for row in points[1:]:
+        row_lengths.append(current_num_points)
+        current_num_points += len(row)
+
+    total_points = row_lengths[-1] + len(points[-1])
+
+    faces = []
+
+    # mesh the top surface first
+    for row_idx, row in enumerate(points[:-1]):         # loop over all but the last row (origin)
+
+        i = 0       # this row
+        j = 0       # next row
+        while i < len(row) - 2:
+
+            # if we are referring vertical points, or there are no more points in the next row, we create right-moving triangles
+            if j >= i or j >= len(points[row_idx + 1]) - 1:
+                # create a triangualr face with this point, the next row's point, and the next point in this row
+                cur = row_lengths[row_idx] + i
+                above = row_lengths[row_idx + 1] + j
+                right = cur + 1
+
+                faces.append([cur, above, right])
+
+                i += 1
+
+            else:       # left-moving triangles
+                # create a triangualr face with this point, the next row's point, and the next point in the next row
+                cur = row_lengths[row_idx] + i
+                above_left = row_lengths[row_idx + 1] + j
+                above = above_left + 1
+
+                faces.append([cur, above_left, above])
+
+                j += 1      # okay to increment, since right-moving triangle condition is >=
+
+    # mesh the bottom surface
+    # we will use the same logic as the top surface, but with the bottom surface function
+    # point indicies will be offset by the number of points in the top surface, while also accounting for boundary points
+    for row_idx, row in enumerate(points[:-1]):         # loop over all but the last row (origin)
+
+        i = 0       # this row
+        j = 0       # next row
+        while i < len(row) - 1:
+
+            # if we are referring vertical points, or there are no more points in the next row, we create right-moving triangles
+            if j >= i or j >= len(points[row_idx + 1]) - 1:
+                # create a triangualr face with this point, the next row's point, and the next point in this row
+
+                if i == 0 or i == len(row) - 1:  # boundary point
+                    cur = row_lengths[row_idx] + i
+                else:
+                    cur = row_lengths[row_idx] + i + total_points
+
+                if j == 0 or j == len(points[row_idx + 1]) - 1:  # boundary point
+                    above = row_lengths[row_idx + 1] + j
+                else:
+                    above = row_lengths[row_idx + 1] + j + total_points
+
+                if i == len(row) - 2:
+                    right = cur + 1         # right point is boundary point
+                else:
+                    right = cur + 1 + total_points
+
+                faces.append([cur, above, right])
+
+                i += 1
+
+            else:       # left-moving triangles
+                # create a triangular face with this point, the next row's point, and the next point in the next row
+
+                if i == 0 or i == len(row) - 1:  # boundary point
+                    cur = row_lengths[row_idx] + i
+                else:
+                    cur = row_lengths[row_idx] + i + total_points
+
+                if j == 0 or j == len(points[row_idx + 1]) - 1:  # boundary point
+                    above_left = row_lengths[row_idx + 1] + j
+                else:
+                    above_left = row_lengths[row_idx + 1] + j + total_points
+
+                if j == len(points[row_idx + 1]) - 2:
+                    above = above_left + 1      # above point is boundary point
+                else:
+                    above = above_left + 1 + total_points
+
+                faces.append([cur, above_left, above])
+
+                j += 1      # okay to increment, since right-moving triangle condition is >=
+
+    # mesh the back surface
+    # back surface is just a plane, connecting the first row for top and bottom surfaces
+    for idx, point in enumerate(points[0]):
+        
+
+        
 
 def main():
 
@@ -216,6 +313,8 @@ def main():
     plt.show()
 
     print(evaluate_points(points, top_z, a, c, f, g, h, i, j, q, s))
+
+    generate_faces(points, a, c, f, g, h, i, j, q, s)
 
 if __name__ == "__main__":
     main()
