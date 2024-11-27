@@ -39,10 +39,10 @@ def bottom_z(x, y, a=0, c=0.0, f=0.2, g=-0.8, h=1.7, i=0.45, j=0.17, q=2.5, s=0.
 # You can use gradients in the meshing process to assign more cells to regions of high curvature, but
 # in this model, regions of high gradients tend to be near the edges of the surface, so as long as we 
 # mesh the edges well, we should be fine.
-def gradient_top(x, y):
+def gradient_top(x, y, a=0, c=0.0, f=0.2, g=-0.8, h=1.7, i=0.45, j=0.17, q=2.5, s=0.5):
     return np.array([4 * a * x**3 + 2 * c * x - g * np.sign(x), -f])
 
-def gradient_bottom(x, y):
+def gradient_bottom(x, y, a=0, c=0.0, f=0.2, g=-0.8, h=1.7, i=0.45, j=0.17, q=2.5, s=0.5):
     return np.array([4 * a * x**3 + 2 * c * x - g * np.sign(x) + 2*y*h*x + 4*q*h*x**3 - 2*q*i*y*x + 2*q*j*x + 3*s*h*x**2 + s*j,
                      -f + h*x**2 - 2*i*y + j - q*i*x**2 + s*i*x])
 
@@ -106,7 +106,7 @@ def generate_x_points(x_max, N):
 
 def generate_points(q, s, dy, initial_N, y_min=-1, y_max=0, append_origin=True):
     """
-    Generate a list of lists containing (x, y, z) points within the specified region.
+    Generate a list of lists containing (x, y) points within the specified region.
     
     Parameters:
     - q, s: Parameters defining the boundary.
@@ -145,6 +145,35 @@ def generate_points(q, s, dy, initial_N, y_min=-1, y_max=0, append_origin=True):
         points_list.append([(0, 0)])
 
     return points_list
+
+def evaluate_points(points, z_func, a, c, f, g, h, i, j, q, s):
+    """
+    Evaluate the z-values of the points using surface functions.
+    
+    Parameters:
+    - points: List of lists containing (x, y) tuples.
+    - z_func: Function for the surface. Takes (x, y, a, c, f, g, h, i, j, q, s) as arguments.
+    - a, c, f, g, h, i, j, q, s: Parameters for the surface.
+
+    Returns:
+    - z_values: List of lists containing (x, y, z) tuples.
+    """
+    return [[(*point, z_func(*point, a, c, f, g, h, i, j, q, s)) for point in row] for row in points]
+
+def generate_faces(points, a, c, f, g, h, i, j, q, s):
+    """
+    Generate faces from the points.
+    
+    Parameters:
+    - points: List of lists containing (x, y) tuples.
+    - a, c, f, g, h, i, j, q, s: Parameters for the surface.
+
+    Returns:
+    - top_faces: List of lists containing indices of points for each face.
+    - bottom_faces: List of lists containing indices of points for each face.
+    """
+
+    pass    
 
 def main():
 
@@ -185,6 +214,8 @@ def main():
     plt.legend()
     plt.grid(True)
     plt.show()
+
+    print(evaluate_points(points, top_z, a, c, f, g, h, i, j, q, s))
 
 if __name__ == "__main__":
     main()
