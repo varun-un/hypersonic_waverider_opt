@@ -20,7 +20,6 @@ z > a*x^4+c*x^2-f*y + g*abs(x)+(y+q*x**2+s*abs(x))*(h*x**2-i*y+j)
 
 import numpy as np
 import matplotlib.pyplot as plt
-import pyvista as pv
 
 points = []
 faces = []
@@ -28,7 +27,12 @@ distances_to_edges = []
 
 # top surface
 def top_z(x, y, a=0, c=0.0, f=0.2, g=-0.8, h=1.7, i=0.45, j=0.17, q=2.5, s=0.5):
-    return a * x**4 + c * x**2 - f * y + g * abs(x)
+    try:
+        return a * x**4 + c * x**2 - f * y + g * abs(x)
+    except Exception as e:
+        print(x, y)
+        print(isinstance(x, (int, float)), isinstance(y, (int, float)))
+        raise e
 
 # bottom surface, characterized by the `term` variable which models the z difference
 def bottom_z(x, y, a=0, c=0.0, f=0.2, g=-0.8, h=1.7, i=0.45, j=0.17, q=2.5, s=0.5):
@@ -146,6 +150,27 @@ def generate_points(q, s, dy, initial_N, y_min=-1, y_max=0, append_origin=True):
 
     return points_list
 
+def get_distances_to_edges(points, q, s):
+    """
+    Get the distances to the edges for each point in the points list.
+    
+    Parameters:
+    - points: List of lists containing (x, y) tuples.
+    - q, s: Parameters defining the boundary.
+    
+    Returns:
+    - distances: List of lists containing the distance to the edge for each point.
+    """
+    distances = []
+    for row in points:
+        row_distances = []
+        for point in row:
+            x, y = point
+            distance = y + q * x**2 + s * abs(x)        # use just straight y-distance as an approximation
+            row_distances.append(distance)
+        distances.append(row_distances)
+    return distances
+
 def evaluate_points(points, z_func, a, c, f, g, h, i, j, q, s):
     """
     Evaluate the z-values of the points using surface functions.
@@ -169,8 +194,9 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
     - a, c, f, g, h, i, j, q, s: Parameters for the surface.
 
     Returns:
-    - top_faces: List of lists containing indices of points for each face.
-    - bottom_faces: List of lists containing indices of points for each face.
+    - faces: List of lists containing indices of points for each face. The fourth entry is the distance to the edge.
+    - total_points: Total number of points in the mesh on one side
+    - row_lengths: List of indices for each row in the points list.
     """
 
     row_lengths = [0]
@@ -182,6 +208,8 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
     total_points = row_lengths[-1] + len(points[-1])
 
     faces = []
+
+    distances = get_distances_to_edges(points, q, s)
 
     # mesh the top surface first
     for row_idx, row in enumerate(points[:-1]):         # loop over all but the last row (origin)
@@ -197,7 +225,7 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
                 above = row_lengths[row_idx + 1] + j
                 right = cur + 1
 
-                faces.append([cur, above, right])
+                faces.append((cur, above, right, distances[row_idx][i]))
 
                 i += 1
 
@@ -207,7 +235,7 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
                 above_left = row_lengths[row_idx + 1] + j
                 above = above_left + 1
 
-                faces.append([cur, above_left, above])
+                faces.append((cur, above_left, above, distances[row_idx][i]))
 
                 j += 1      # okay to increment, since right-moving triangle condition is >=
 
@@ -239,7 +267,7 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
                 else:
                     right = cur + 1 + total_points
 
-                faces.append([cur, above, right])
+                faces.append((cur, above, right, distances[row_idx][i]))
 
                 i += 1
 
@@ -261,15 +289,106 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
                 else:
                     above = above_left + 1 + total_points
 
-                faces.append([cur, above_left, above])
+                faces.append((cur, above_left, above, distances[row_idx][i]))
 
                 j += 1      # okay to increment, since right-moving triangle condition is >=
 
     # mesh the back surface
     # back surface is just a plane, connecting the first row for top and bottom surfaces
-    for idx, point in enumerate(points[0]):
-        
+    jdx = 0
+    idx = 0
+    x_max = solve_for_x(-1, q, s)
+    while idx < len(points[0]) - 1:
 
+        # get distance
+        dist = x_max - np.abs(points[0][idx][0])
+
+        if idx == 0 and jdx == 0:       # left corner
+            faces.append((idx, idx + 1, jdx + 1 + total_points, dist))
+            idx += 1
+            jdx += 1
+        elif idx == len(points[0]) - 2 and jdx == len(points[0]) - 2:        # right corner
+            faces.append((idx, jdx + total_points, idx + 1, dist))
+            idx += 1
+            jdx += 1
+            break
+        elif idx == jdx:        # right up facing triangle
+            faces.append((idx, idx + 1, jdx + total_points, dist))
+            idx += 1
+        elif jdx < idx:         # left down facing triangle
+            faces.append((idx, jdx + total_points, jdx + 1 + total_points, dist))
+            jdx += 1
+
+    return faces, total_points, row_lengths
+
+def write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h, i, j, q, s, priority_scale = [1, 5]):
+    """
+    Write the points and faces to a VTK file.
+
+    Parameters:
+    - points: List of lists containing (x, y) tuples. Surface agnostic.
+    - faces: List of lists containing indices of points for each face. Contains top, bottom and back surfaces.
+    - total_points: Total number of points in the mesh on the top side
+    - row_lengths: List of indices for each row in the points list.
+    - filename: Name of the VTK file to write to.
+    - a, c, f, g, h, i, j, q, s: Parameters for the surface.
+    - priority_scale: List of two integers, the first being the lowest priority and the second being the highest priority assigned to cells.
+    """
+
+    f_param = f
+
+    # setup file
+    with open(filename, 'w') as f:
+        f.write("# vtk DataFile Version 3.0\n")
+        f.write("vtk output\n")
+        f.write("ASCII\n")
+        f.write("DATASET POLYDATA\n")
+
+        # for top and bottom surfaces, but remove boundary points for back surface
+        abs_tot_points = total_points * 2 - 2 * (len(row_lengths) - 1)
+
+        # write points
+        f.write(f"POINTS {abs_tot_points} float\n")
+        for row in points:
+            for point in row:
+                z = top_z(point[0], point[1], a, c, f_param, g, h, i, j, q, s)
+                f.write(f"{point[0]} {point[1]} {z}\n")
+
+        # write back surface
+        for row in points:
+            for point in row[1:-1]:     # exclude boundary points
+                z = bottom_z(point[0], point[1], a, c, f_param, g, h, i, j, q, s)
+                f.write(f"{float(point[0])} {float(point[1])} {float(z)}\n")
+
+        # write faces
+        f.write(f"POLYGONS {len(faces)} {len(faces) * 4}\n")
+        for face in faces:
+            f.write(f"3 {face[0]} {face[1]} {face[2]}\n")
+
+        # write face priorities
+        f.write(f"CELL_DATA {len(faces)}\n")
+        f.write("SCALARS Components int\n")
+        f.write("LOOKUP_TABLE default\n")
+
+        # loop over faces and assign priorities (randomly chose y = -0.5 to gauge)
+        max_dist = solve_for_x(-0.5, q, s) / 2
+        min_dist = solve_for_x(-0.5, q, s) / 8
+
+        # create a list of thresholds, interpolates between min and max distances
+        thresholds = np.linspace(min_dist, max_dist, priority_scale[1] - priority_scale[0] + 1)
+
+        for face in faces:
+            # just use the first point in the face to determine priority
+            distance = face[3]
+
+            # find the priority
+            priority = 0
+            for idx, thresh in enumerate(thresholds):
+                if distance < thresh:
+                    priority = idx + priority_scale[0]
+                    break
+
+            f.write(f"           {priority}\n")
         
 
 def main():
@@ -284,8 +403,8 @@ def main():
     q = 2.5
     s = 0.5
 
-    dy = 0.05
-    initial_N = 21
+    dy = 0.2
+    initial_N = 6
     y_min = -1.0
     y_max = 0.0
     
@@ -310,11 +429,16 @@ def main():
     plt.title('Generated Points Within the Specified Region')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    # plt.show()
 
-    print(evaluate_points(points, top_z, a, c, f, g, h, i, j, q, s))
+    faces, total_points, row_lengths = generate_faces(points, a, c, f, g, h, i, j, q, s)
 
-    generate_faces(points, a, c, f, g, h, i, j, q, s)
+    write_file(points, faces, total_points, row_lengths, "output.vtk", a, c, f, g, h, i, j, q, s)
+
+    import pyvista as pv
+
+    mesh = pv.read("output.vtk")
+    mesh.plot(show_edges=True)
 
 if __name__ == "__main__":
     main()
