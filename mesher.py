@@ -20,6 +20,7 @@ z > a*x^4+c*x^2-f*y + g*abs(x)+(y+q*x**2+s*abs(x))*(h*x**2-i*y+j)
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pyvista as pv
 
 points = []
 faces = []
@@ -108,7 +109,7 @@ def generate_x_points(x_max, N):
     return x_points
 
 
-def generate_points(q, s, dy, initial_N, y_min=-1, y_max=0, append_origin=True):
+def generate_points(q, s, dy, initial_N, y_min=-1, y_max=0, append_origin=False):
     """
     Generate a list of lists containing (x, y) points within the specified region.
     
@@ -147,6 +148,11 @@ def generate_points(q, s, dy, initial_N, y_min=-1, y_max=0, append_origin=True):
     
     if append_origin:
         points_list.append([(0, 0)])
+
+
+    # first row has two last points, so fix that
+    points_list[0] = points_list[0][:-1]
+
 
     return points_list
 
@@ -216,7 +222,7 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
 
         i = 0       # this row
         j = 0       # next row
-        while i < len(row) - 2:
+        while (i < len(row) - 1 and len(points[row_idx + 1]) < len(row)) or (i <= len(row) - 1 and j < len(points[row_idx + 1]) - 1 and len(points[row_idx + 1]) == len(row)):
 
             # if we are referring vertical points, or there are no more points in the next row, we create right-moving triangles
             if j >= i or j >= len(points[row_idx + 1]) - 1:
@@ -242,82 +248,82 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
     # mesh the bottom surface
     # we will use the same logic as the top surface, but with the bottom surface function
     # point indicies will be offset by the number of points in the top surface, while also accounting for boundary points
-    for row_idx, row in enumerate(points[:-1]):         # loop over all but the last row (origin)
+    # for row_idx, row in enumerate(points[:-1]):         # loop over all but the last row (origin)
 
-        i = 0       # this row
-        j = 0       # next row
-        while i < len(row) - 1:
+    #     i = 0       # this row
+    #     j = 0       # next row
+    #     while (i < len(row) - 1 and len(points[row_idx + 1]) < len(row)) or (i <= len(row) - 1 and len(points[row_idx + 1]) == len(row)):
 
-            # if we are referring vertical points, or there are no more points in the next row, we create right-moving triangles
-            if j >= i or j >= len(points[row_idx + 1]) - 1:
-                # create a triangualr face with this point, the next row's point, and the next point in this row
+    #         # if we are referring vertical points, or there are no more points in the next row, we create right-moving triangles
+    #         if j >= i or j >= len(points[row_idx + 1]) - 1:
+    #             # create a triangualr face with this point, the next row's point, and the next point in this row
 
-                if i == 0 or i == len(row) - 1:  # boundary point
-                    cur = row_lengths[row_idx] + i
-                else:
-                    cur = row_lengths[row_idx] + i + total_points
+    #             if i == 0 or i == len(row) - 1:  # boundary point
+    #                 cur = row_lengths[row_idx] + i
+    #             else:
+    #                 cur = row_lengths[row_idx] + i + total_points
 
-                if j == 0 or j == len(points[row_idx + 1]) - 1:  # boundary point
-                    above = row_lengths[row_idx + 1] + j
-                else:
-                    above = row_lengths[row_idx + 1] + j + total_points
+    #             if j == 0 or j == len(points[row_idx + 1]) - 1:  # boundary point
+    #                 above = row_lengths[row_idx + 1] + j
+    #             else:
+    #                 above = row_lengths[row_idx + 1] + j + total_points
 
-                if i == len(row) - 2:
-                    right = cur + 1         # right point is boundary point
-                else:
-                    right = cur + 1 + total_points
+    #             if i == len(row) - 2:
+    #                 right = cur + 1         # right point is boundary point
+    #             else:
+    #                 right = cur + 1 + total_points
 
-                faces.append((cur, above, right, distances[row_idx][i]))
+    #             faces.append((cur, above, right, distances[row_idx][i]))
 
-                i += 1
+    #             i += 1
 
-            else:       # left-moving triangles
-                # create a triangular face with this point, the next row's point, and the next point in the next row
+    #         else:       # left-moving triangles
+    #             # create a triangular face with this point, the next row's point, and the next point in the next row
 
-                if i == 0 or i == len(row) - 1:  # boundary point
-                    cur = row_lengths[row_idx] + i
-                else:
-                    cur = row_lengths[row_idx] + i + total_points
+    #             if i == 0 or i == len(row) - 1:  # boundary point
+    #                 cur = row_lengths[row_idx] + i
+    #             else:
+    #                 cur = row_lengths[row_idx] + i + total_points
 
-                if j == 0 or j == len(points[row_idx + 1]) - 1:  # boundary point
-                    above_left = row_lengths[row_idx + 1] + j
-                else:
-                    above_left = row_lengths[row_idx + 1] + j + total_points
+    #             if j == 0 or j == len(points[row_idx + 1]) - 1:  # boundary point
+    #                 above_left = row_lengths[row_idx + 1] + j
+    #             else:
+    #                 above_left = row_lengths[row_idx + 1] + j + total_points
 
-                if j == len(points[row_idx + 1]) - 2:
-                    above = above_left + 1      # above point is boundary point
-                else:
-                    above = above_left + 1 + total_points
+    #             if j == len(points[row_idx + 1]) - 2:
+    #                 above = above_left + 1      # above point is boundary point
+    #             else:
+    #                 above = above_left + 1 + total_points
 
-                faces.append((cur, above_left, above, distances[row_idx][i]))
+    #             faces.append((cur, above_left, above, distances[row_idx][i]))
 
-                j += 1      # okay to increment, since right-moving triangle condition is >=
+    #             j += 1      # okay to increment, since right-moving triangle condition is >=
 
-    # mesh the back surface
-    # back surface is just a plane, connecting the first row for top and bottom surfaces
-    jdx = 0
-    idx = 0
-    x_max = solve_for_x(-1, q, s)
-    while idx < len(points[0]) - 1:
+    # # mesh the back surface
+    # # back surface is just a plane, connecting the first row for top and bottom surfaces
+    # jdx = 0
+    # idx = 0
+    # x_max = solve_for_x(-1, q, s)
+    # while idx < len(points[0]) - 1:
 
-        # get distance
-        dist = x_max - np.abs(points[0][idx][0])
+    #     # get distance
+    #     dist = x_max - np.abs(points[0][idx][0])
 
-        if idx == 0 and jdx == 0:       # left corner
-            faces.append((idx, idx + 1, jdx + 1 + total_points, dist))
-            idx += 1
-            jdx += 1
-        elif idx == len(points[0]) - 2 and jdx == len(points[0]) - 2:        # right corner
-            faces.append((idx, jdx + total_points, idx + 1, dist))
-            idx += 1
-            jdx += 1
-            break
-        elif idx == jdx:        # right up facing triangle
-            faces.append((idx, idx + 1, jdx + total_points, dist))
-            idx += 1
-        elif jdx < idx:         # left down facing triangle
-            faces.append((idx, jdx + total_points, jdx + 1 + total_points, dist))
-            jdx += 1
+    #     if idx == 0 and jdx == 0:       # left corner
+    #         faces.append((idx, idx + 1, jdx + 1 + total_points, dist))
+    #         idx += 1
+    #         jdx += 1
+    #     elif idx == len(points[0]) - 2 and jdx == len(points[0]) - 2:        # right corner
+    #         faces.append((idx, jdx + total_points, idx + 1, dist))
+    #         idx += 1
+    #         jdx += 1
+    #         break
+    #     elif idx == jdx:        # right up facing triangle
+    #         faces.append((idx, idx + 1, jdx + total_points, dist))
+    #         idx += 1
+    #     elif jdx < idx:         # left down facing triangle
+    #         faces.append((idx, jdx + total_points, jdx + 1 + total_points, dist))
+    #         jdx += 1
 
     return faces, total_points, row_lengths
 
@@ -349,16 +355,40 @@ def write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h
 
         # write points
         f.write(f"POINTS {abs_tot_points} float\n")
+        ps = []
+        pst = []
+        psb = []
         for row in points:
             for point in row:
                 z = top_z(point[0], point[1], a, c, f_param, g, h, i, j, q, s)
                 f.write(f"{point[0]} {point[1]} {z}\n")
+                ps.append([point[0], point[1], z])
+                pst.append([point[0], point[1], z])
 
         # write back surface
         for row in points:
+            print("ROW: ", row)
             for point in row[1:-1]:     # exclude boundary points
                 z = bottom_z(point[0], point[1], a, c, f_param, g, h, i, j, q, s)
                 f.write(f"{float(point[0])} {float(point[1])} {float(z)}\n")
+                ps.append([point[0], point[1], z])
+                psb.append([point[0], point[1], z])
+
+        print(pst)
+        print(psb)
+
+        # plot the points in 3D with matplotlib
+        ps = np.array(ps)
+        pst = np.array(pst)
+        psb = np.array(psb)
+        fig = plt.figure(figsize=(10, 6))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(pst[:, 0], pst[:, 1], pst[:, 2], c='r', marker='o')
+        ax.scatter(psb[:, 0], psb[:, 1], psb[:, 2], c='g', marker='o')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        plt.show()
 
         # write faces
         f.write(f"POLYGONS {len(faces)} {len(faces) * 4}\n")
@@ -403,8 +433,8 @@ def main():
     q = 2.5
     s = 0.5
 
-    dy = 0.2
-    initial_N = 6
+    dy = 0.5
+    initial_N = 3
     y_min = -1.0
     y_max = 0.0
     
@@ -429,16 +459,14 @@ def main():
     plt.title('Generated Points Within the Specified Region')
     plt.legend()
     plt.grid(True)
-    # plt.show()
+    plt.show()
 
     faces, total_points, row_lengths = generate_faces(points, a, c, f, g, h, i, j, q, s)
 
     write_file(points, faces, total_points, row_lengths, "output.vtk", a, c, f, g, h, i, j, q, s)
 
-    import pyvista as pv
-
     mesh = pv.read("output.vtk")
-    mesh.plot(show_edges=True)
+    mesh.plot(show_edges=True, show_grid=True)
 
 if __name__ == "__main__":
     main()
