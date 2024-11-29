@@ -105,11 +105,15 @@ def generate_x_points(x_max, N):
     # usually omits the left border point, so correct for that
     if x_points[0] != -x_max:
         x_points = np.append(-x_max, x_points)
+
+    # check to right duplicates
+    if x_points[-1] == x_points[-2]:
+        x_points = x_points[:-1]
     
     return x_points
 
 
-def generate_points(q, s, dy, initial_N, y_min=-1, y_max=0, append_origin=False):
+def generate_points(q, s, dy, initial_N, y_min=-1, y_max=0):
     """
     Generate a list of lists containing (x, y) points within the specified region.
     
@@ -127,6 +131,11 @@ def generate_points(q, s, dy, initial_N, y_min=-1, y_max=0, append_origin=False)
     points_list = []
     current_y = y_min
     N = initial_N
+
+    if initial_N > (1 / dy) + 1:        # add origin to close the last row
+        append_origin = True
+    else:
+        append_origin = False
     
     while current_y <= y_max and N > 0:
         x_pos = solve_for_x(current_y, q, s)
@@ -255,7 +264,8 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
         i = 0       # this row
         j = 0       # next row
         while (i < len(row) - 1 and len(points[row_idx + 1]) < len(row)) or (i <= len(row) - 1 and j < len(points[row_idx + 1]) - 1 and len(points[row_idx + 1]) == len(row)):
-            # if we are referring vertical points, or there are no more points in the next row, we create right-moving triangles
+            # if we are referring vertical points, or there are no more points in the next row
+            # right facing triangles
             if j >= i or j >= len(points[row_idx + 1]) - 1:
                 # create a triangular face with this point, the next row's point, and the next point in this row
 
@@ -278,7 +288,7 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
                         prev_boundaries = 2 * (row_idx + 1) - 1
                         right= cur + 1 + total_points - prev_boundaries
                     else:
-                        right = cur + 1 + total_points
+                        right = cur + 1
 
                 faces.append((above, cur, right, distances[row_idx][i]))
 
@@ -332,11 +342,11 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
             jdx += 1
             break
         elif idx == jdx:        # right up facing triangle
-            faces.append((idx + 1, idx, jdx + total_points, dist))
-            idx += 1
-        elif jdx < idx:         # left down facing triangle
-            faces.append((jdx + total_points, idx, jdx + 1 + total_points, dist))
+            faces.append((jdx + total_points, idx, jdx + total_points - 1, dist))
             jdx += 1
+        elif jdx > idx:         # left down facing triangle
+            faces.append((jdx + total_points - 1, idx, idx + 1, dist))
+            idx += 1
 
     return faces, total_points, row_lengths
 
@@ -446,8 +456,8 @@ def main():
     q = 2.5
     s = 0.5
 
-    dy = 0.5
-    initial_N = 4
+    dy = 0.05
+    initial_N = 22
     y_min = -1.0
     y_max = 0.0
     
