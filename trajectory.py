@@ -175,7 +175,7 @@ def get_lift_drag(speed, altitude, geometry_length, S, **kwargs):
     return F_L, F_D
 
 # Trajectory Simulation
-def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S, timestep=.01, **kwargs):
+def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S, timestep=.01, verbose = False, **kwargs):
     """
     Simulate the trajectory of the waverider until it reaches the ground.
     
@@ -186,6 +186,7 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         geometry_length (float): Characteristic length of the geometry in meters.
         S (float): Reference area in m^2.
         timestep (float): Time step resolution in seconds.
+        verbose (bool): Print simulation details.
         **kwargs: Additional keyword arguments to pass to get_lift_drag.
                     Can specify Cl and Cd directly. Use `cl` and `cd` to pass the values.
     
@@ -258,7 +259,8 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         if altitude < 0:
             altitude = 0
         
-        print(f"Time: {time_elapsed:.2f}s, X: {x_position:.2f}m, Altitude: {altitude:.2f}m, Vx: {Vx:.2f}m/s, Vz: {Vz:.2f}m/s")
+        if verbose:
+            print(f"Time: {time_elapsed:.2f}s, X: {x_position:.2f}m, Altitude: {altitude:.2f}m, Vx: {Vx:.2f}m/s, Vz: {Vz:.2f}m/s")
     
     return x_position
 
@@ -278,6 +280,7 @@ def single_shot():
         geometry_length=geometry_length,
         S=S,
         timestep=timestep,
+        verbose=True
     )
     
     print(f"Total horizontal distance traveled: {distance_traveled:.2f} meters")

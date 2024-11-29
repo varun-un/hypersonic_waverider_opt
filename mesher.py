@@ -21,17 +21,12 @@ z > a*x^4+c*x^2-f*y + g*abs(x)+(y+q*x**2+s*abs(x))*(h*x**2-i*y+j)
 import numpy as np
 import matplotlib.pyplot as plt
 
-points = []
-faces = []
-distances_to_edges = []
-
 # top surface
 def top_z(x, y, a=0, c=0.0, f=0, g=-0.8, h=1.7, i=0.45, j=0.17, q=2.5, s=0.5):
     try:
         return a * x**4 + c * x**2 - f * y + g * abs(x)
     except Exception as e:
         print(x, y)
-        print(isinstance(x, (int, float)), isinstance(y, (int, float)))
         raise e
 
 # bottom surface, characterized by the `term` variable which models the z difference
@@ -221,7 +216,6 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
         current_num_points += len(row)
 
     total_points = row_lengths[-1] + len(points[-1])
-    print(points, "YEEE", total_points)
 
     faces = []
 
@@ -390,7 +384,7 @@ def write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h
 
         # write back surface
         for row in points:
-            print("ROW: ", row)
+            # print("ROW: ", row)
             for point in row[1:-1]:     # exclude boundary points
                 z = bottom_z(point[0], point[1], a, c, f_param, g, h, i, j, q, s)
                 f.write(f"{float(point[0])} {float(point[1])} {float(z)}\n")

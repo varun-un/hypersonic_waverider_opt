@@ -6,10 +6,14 @@ alternative is scipy.optimize.minimize with COBYLA
 
 import trajectory as tj
 from volume import find_x_bounds
+from mesher import generate_mesh
 import numpy as np
 import pyvista as pv
 import bpy
-from skopt import gp_minimize       # BO w/ Gaussian Process & RBF (allegedly better than Random Forest)
+from skopt import gp_minimize       # BO w/ Gaussian Process & RBF
+from skopt.space import Real
+from skopt.callbacks import CheckpointSaver
+
 
 def get_i(params):
     """
@@ -56,131 +60,21 @@ def get_i(params):
     
     return i
 
-def generate_vtk(geometry_params):
+def run_cfd(vtk_filename):
     """
-    Given the 9-D parameter vector, generate a VTK file for the solid defined by the parameters.
+    Runs the Champs solver on the given VTK file.
 
     Parameters:
-        geometry_params (np.array): 9D vector of parameters. In order: [a, c, f, g, h, i, j, q, s]
+        vtk_filename: Name of the VTK file to run the solver on.
+
+    Returns:
+        lift: Lift coefficient from the simulation.
+        drag: Drag coefficient from the simulation.
     """
-    a, c, f, g, h, i, j, q, s = geometry_params
-
-    X_POINTS = 10
-    Y_POINTS = 10
-
-    # Top surface function
-    def top_surface(x, y):
-        return a * x**4 + c * x**2 - f * y + g * np.abs(x)
-
-    # Bottom surface function
-    def bottom_surface(x, y):
-        term1 = a * x**4 + c * x**2 - f * y + g * np.abs(x)
-        term2 = (y + q * x**2 + s * np.abs(x)) * (h * x**2 - i * y + j)
-        return term1 + term2
-
-    # Domain functions
-    def domain_boundary(x):
-        return -q * x**2 - s * np.abs(x)
-    
-    # Define the range of x values for the domain
-    x_min, x_max = find_x_bounds(q, s)
-    num_points = 10  # Number of points along the edge (set N as needed)
-    x_edge = np.linspace(x_min, x_max, num_points)
-
-    # Compute y values along the intersection edge y = -q*x^2 - s*abs(x)
-    y_edge = domain_boundary(x_edge)
-
-    # Compute z values on the top and bottom surfaces along the edge
-    z_top_edge = top_surface(x_edge, y_edge)
-    z_bottom_edge = bottom_surface(x_edge, y_edge)
-
-    y_back = -1
-    x_back = np.linspace(x_min, x_max, num_points)
-
-    # Compute z values on the top and bottom surfaces at y = -1
-    z_top_back = top_surface(x_back, y_back)
-    z_bottom_back = bottom_surface(x_back, y_back)
-
-    # Create mesh grids for x and y within the domain
-    x_vals = np.linspace(x_min, x_max, X_POINTS)  # Number of x points
-    y_vals = np.linspace(y_back, y_edge.min(), Y_POINTS)  # Number of y points
-
-    print(x_vals)
-    print(y_vals)
-
-    X, Y = np.meshgrid(x_vals, y_vals)
-
-    # Flatten the arrays for processing
-    X_flat = X.flatten()
-    Y_flat = Y.flatten()
-
-    # Compute Z values for the top and bottom surfaces
-    Z_top = top_surface(X_flat, Y_flat)
-    Z_bottom = bottom_surface(X_flat, Y_flat)
-
-    # Stack the coordinates
-    points_top = np.vstack((X_flat, Y_flat, Z_top)).T
-    points_bottom = np.vstack((X_flat, Y_flat, Z_bottom)).T
-
-    # Determine the number of cells in x and y directions
-    n_cells_x = X_POINTS - 1
-    n_cells_y = Y_POINTS - 1
-    n_cells = n_cells_x * n_cells_y
-
-    # Initialize lists to hold cell definitions
-    faces = []
-
-    # Build faces for the top surface
-    for i in range(n_cells_y):
-        for j in range(n_cells_x):
-            idx = i * X_POINTS + j
-            face = [4,  # Number of points in the face (quad)
-                    idx,
-                    idx + 1,
-                    idx + X_POINTS + 1,
-                    idx + X_POINTS]
-            faces.extend(face)
-
-    # Convert to numpy array
-    faces = np.array(faces)
+    pass
 
 
-    # Create PyVista mesh for the top surface
-    mesh_top = pv.PolyData()
-    mesh_top.points = points_top
-    mesh_top.faces = faces
-
-    # Similarly for the bottom surface
-    mesh_bottom = pv.PolyData()
-    mesh_bottom.points = points_bottom
-    mesh_bottom.faces = faces
-
-    # Combine top and bottom meshes
-    combined_mesh = mesh_top.merge(mesh_bottom)
-
-    # Add the back surface (plane at y = -1)
-    back_plane_points = np.vstack((x_back, y_back * np.ones_like(x_back), z_top_back)).T
-    back_plane = pv.PolyData(back_plane_points)
-
-    # Assuming the back plane is connected appropriately
-    combined_mesh = combined_mesh.merge(back_plane)
-
-    # Perform mesh cleaning operations if necessary
-    combined_mesh.clean(inplace=True)
-
-    combined_mesh.plot(show_edges=True)
-
-    # Save the mesh
-    combined_mesh.save('waverider.vtk')
-
-
-
-
-
-
-
-
-def cost_fcn(params):
+def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.vtk"):
     """
     Takes the 8-D parameter vector and computes the cost function. 
     Uses params to find the i coefficient, creates a VTK, calls the CFD solver, and computes the cost.
@@ -188,6 +82,13 @@ def cost_fcn(params):
 
     Parameters:
         params (np.array): 8-D vector of parameters. In order: [a, c, f, g, h, j, q, s]
+        dy: Step size in y for each row in the meshing.
+        initial_N: Initial number of points in the meshing, in the y=-1 row.
+        timestep: Timestep of the trajectory simulation, in seconds.
+        filename: Name of the VTK file to save.
+
+    Returns:
+        cost: The computed cost of the trajectory. This is the negative of the distance travelled.
     """
 
     i = get_i(params)
@@ -195,9 +96,16 @@ def cost_fcn(params):
     if i is None:
         return np.inf - 1
 
-    #-------------------------------------
+    valid = generate_mesh(a, c, f, g, h, i, j, q, s, dy, initial_N, filename)
+    if not valid:
+        return np.inf - 1
 
-    return cost
+    # ------ Run CFD ------
+    lift, drag = run_cfd(filename)
+
+    cost = tj.simulate_trajectory(timestep, lift, drag)
+
+    return -1 * cost
 
 if __name__ == "__main__":
 
@@ -211,4 +119,41 @@ if __name__ == "__main__":
     q = 0
     s = 1.84
 
-    generate_vtk([a, c, f, g, h, i, j, q, s])
+    # Define the parameter space
+    space = [
+        Real(-10.0, 10.0, name='a'),
+        Real(-10.0, 10.0, name='c'),
+        Real(0.0, 0.0, name='f'),           # restrict f to 0 to get 0 angle of attack
+        Real(-5.0, 5.0, name='g'),
+        Real(0.0, 15.0, name='h'),
+        Real(0.0, 2.0, name='j'),
+        Real(0.0, 10.0, name='q'),
+        Real(0.0, 10.0, name='s')
+    ]
+
+    # spacing in the y direction for meshing
+    dy = 0.05
+    # max number of mesh vertices in the y=-1 row
+    initial_N = 22
+    # timestep for trajectory simulation
+    timestep = 1
+    # filename to save the VTK file to
+    filename = "../generated_waverider.vtk"
+
+    cost_fcn_partial = lambda x: cost_fcn(x, dy, initial_N, timestep, filename)       # partial function to pass to gp_minimize
+
+    checkpoint_saver = CheckpointSaver("./outputs/bo_checkpoint.pkl", compress=3)
+
+    # Run Bayesian Optimization
+    result = gp_minimize(
+        x0=[a, c, f, g, h, j, q, s],        # Initial guess
+        func=cost_fcn_partial,              # Objective function to minimize
+        dimensions=space,                   # Search space
+        acq_func="EI",                      # Acquisition function
+        n_calls=50,                         # Total number of evaluations
+        n_initial_points=5,                 # Initial random evaluations
+        random_state=1,                     # Seed for reproducibility
+        callback=[checkpoint_saver],        # Save progress
+        noise="gaussian",                   # Assume somewhat noisy observations
+        verbose=True                        # Print progress
+    )
