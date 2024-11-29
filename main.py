@@ -14,6 +14,10 @@ from skopt import gp_minimize       # BO w/ Gaussian Process & RBF
 from skopt.space import Real
 from skopt.callbacks import CheckpointSaver
 
+import os
+import subprocess
+import time
+
 
 def get_i(params):
     """
@@ -65,13 +69,83 @@ def run_cfd(vtk_filename):
     Runs the Champs solver on the given VTK file.
 
     Parameters:
-        vtk_filename: Name of the VTK file to run the solver on.
+        vtk_filename (str): Name of the VTK file to run the solver on.
 
     Returns:
-        lift: Lift coefficient from the simulation.
-        drag: Drag coefficient from the simulation.
+        tuple: (lift, drag) coefficients from the simulation.
+               Returns (np.inf, np.inf) if an error occurs.
     """
-    pass
+    try:
+        # Get the directory of the current script
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # Get the parent directory
+        parent_dir = os.path.abspath(os.path.join(current_dir, ".."))
+        
+        # Path to the integrated_loads.dat file
+        loads_file = os.path.join(parent_dir, "sim", "surf", "integrated_loads.dat")
+        
+        # Ensure the loads_file exists; if not, wait for it to be created
+        max_wait_time = 900  # Maximum wait time in seconds (15 minutes)
+        wait_interval = 5    # Interval between checks in seconds
+        elapsed_time = 0
+
+        while not os.path.exists(loads_file):
+            if elapsed_time >= max_wait_time:
+                print(f"Timeout: {loads_file} does not exist.")
+                return np.inf, np.inf
+            time.sleep(wait_interval)
+            elapsed_time += wait_interval
+
+        # Record the initial modification time of the loads_file
+        initial_mtime = os.path.getmtime(loads_file)
+        
+        # Submit the CFD job using sbatch
+        submit_command = ["./champs+", "input.sdf"]
+        subprocess.run(submit_command, cwd=parent_dir, check=True)
+        
+        print("CFD job submitted. Waiting for completion...")
+        
+        # Wait for the loads_file to be updated by the CFD job
+        while True:
+            time.sleep(wait_interval)
+            elapsed_time += wait_interval
+            if elapsed_time >= max_wait_time:
+                print("Timeout waiting for CFD job to complete.")
+                return np.inf, np.inf
+            current_mtime = os.path.getmtime(loads_file)
+            if current_mtime > initial_mtime:
+                print("CFD job completed.")
+                break
+
+        # Read the last line of the integrated_loads.dat file
+        with open(loads_file, "r") as file:
+            lines = file.readlines()
+            if not lines:
+                print("Error: integrated_loads.dat is empty.")
+                return np.inf, np.inf
+            last_line = lines[-1].strip()
+            tokens = last_line.split()
+            
+            if len(tokens) < 5:
+                print("Error: Not enough data in the last line of integrated_loads.dat.")
+                return np.inf, np.inf
+            
+            try:
+                # Extract drag and lift from the specified positions
+                drag = float(tokens[-5])
+                lift = float(tokens[-4])
+                print(f"Lift: {lift}, Drag: {drag}")
+                return lift, drag
+            except ValueError as ve:
+                print(f"Error parsing lift and drag values: {ve}")
+                return np.inf, np.inf
+
+    except subprocess.CalledProcessError as e:
+        print(f"Subprocess error: {e}")
+        return np.inf, np.inf
+    except Exception as ex:
+        print(f"An unexpected error occurred: {ex}")
+        return np.inf, np.inf
 
 
 def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.vtk"):
@@ -142,6 +216,7 @@ if __name__ == "__main__":
 
     cost_fcn_partial = lambda x: cost_fcn(x, dy, initial_N, timestep, filename)       # partial function to pass to gp_minimize
 
+    pkl_name = f"./outputs/bo_{time.time()}.pkl"
     checkpoint_saver = CheckpointSaver("./outputs/bo_checkpoint.pkl", compress=3)
 
     # Run Bayesian Optimization
