@@ -18,6 +18,11 @@ import os
 import subprocess
 import time
 
+MASS = 25
+INITIAL_ALT = 40000.0  # meters (40 km)
+INITIAL_M = 10.0      # Mach number
+GEOMETRY_LENGTH = 1.0  # meters
+
 
 def get_i(params):
     """
@@ -176,8 +181,37 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
 
     # ------ Run CFD ------
     lift, drag = run_cfd(filename)
+    if lift == np.inf or drag == np.inf:
+        return np.inf - 1
 
-    cost = tj.simulate_trajectory(timestep, lift, drag)
+    # calculate reference area (area between y = -qx^2 -s|x| and y = -1)
+    _, x_max = find_x_bounds(q, s)
+
+    S = 2 * (x_max - q * x_max**3 / 3 - s * x_max**2 / 2)  # Reference area in m²
+
+
+    # ------ Convert to Coefficients ------
+    GAMMA = 1.4               # Ratio of specific heats for air
+    R = 287.05                # Specific gas constant for air, J/(kg·K)
+    MACH_NUMBER = 7.0         # CFD Mach number
+
+    # Retrieve atmospheric properties
+    atm = tj.get_atm(INITIAL_ALT)
+    temperature = atm['temperature']        # in Kelvin
+    density = atm['density']                # in kg/m³
+
+    # speed of sound
+    speed_of_sound = np.sqrt(GAMMA * R * temperature)  # in m/s
+
+    velocity = MACH_NUMBER * speed_of_sound           # in m/s
+
+    # dynamic pressure
+    dynamic_pressure = 0.5 * density * velocity**2    # in Pascals (N/m²)
+
+    c_l = lift / (dynamic_pressure * S)   # Dimensionless
+    c_d = drag / (dynamic_pressure * S)   # Dimensionless
+
+    cost = tj.simulate_trajectory(MASS, INITIAL_ALT, INITIAL_M, GEOMETRY_LENGTH, S, timestep, cl=c_l, cd=c_d)
 
     return -1 * cost
 
