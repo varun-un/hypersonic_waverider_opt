@@ -20,7 +20,6 @@ z > a*x^4+c*x^2-f*y + g*abs(x)+(y+q*x**2+s*abs(x))*(h*x**2-i*y+j)
 
 import numpy as np
 import matplotlib.pyplot as plt
-import pyvista as pv
 
 points = []
 faces = []
@@ -501,6 +500,9 @@ def main():
     faces, total_points, row_lengths = generate_faces(points, a, c, f, g, h, i, j, q, s)
 
     write_file(points, faces, total_points, row_lengths, "output.vtk", a, c, f, g, h, i, j, q, s, plot_points=True)
+
+    # delayed import to avoid bloating opt script
+    import pyvista as pv
 
     mesh = pv.read("output.vtk")
     mesh.plot_normals(mag=0.1, color='black')
