@@ -377,7 +377,7 @@ def write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h
         for row in points:
             for point in row:
                 z = top_z(point[0], point[1], a, c, f_param, g, h, i, j, q, s)
-                f.write(f"{point[0]} {point[1]} {z}\n")
+                f.write(f"{point[0]} {-1 * point[1]} {z}\n")
 
                 if plot_points:
                     pst.append([point[0], point[1], z])
@@ -387,7 +387,7 @@ def write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h
             # print("ROW: ", row)
             for point in row[1:-1]:     # exclude boundary points
                 z = bottom_z(point[0], point[1], a, c, f_param, g, h, i, j, q, s)
-                f.write(f"{float(point[0])} {float(point[1])} {float(z)}\n")
+                f.write(f"{float(point[0])} {float(-1 * point[1])} {float(z)}\n")
             
                 if plot_points:
                     psb.append([point[0], point[1], z])
@@ -408,7 +408,7 @@ def write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h
         # write faces
         f.write(f"POLYGONS {len(faces)} {len(faces) * 4}\n")
         for face in faces:
-            f.write(f"3 {face[0]} {face[1]} {face[2]}\n")
+            f.write(f"3 {face[1]} {face[0]} {face[2]}\n")
 
         # write face priorities
         f.write(f"CELL_DATA {len(faces)}\n")
