@@ -8,8 +8,6 @@ import trajectory as tj
 from volume import find_x_bounds
 from mesher import generate_mesh
 import numpy as np
-import pyvista as pv
-import bpy
 from skopt import gp_minimize       # BO w/ Gaussian Process & RBF
 from skopt.space import Real
 from skopt.callbacks import CheckpointSaver
