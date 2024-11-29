@@ -27,7 +27,7 @@ faces = []
 distances_to_edges = []
 
 # top surface
-def top_z(x, y, a=0, c=0.0, f=0.2, g=-0.8, h=1.7, i=0.45, j=0.17, q=2.5, s=0.5):
+def top_z(x, y, a=0, c=0.0, f=0, g=-0.8, h=1.7, i=0.45, j=0.17, q=2.5, s=0.5):
     try:
         return a * x**4 + c * x**2 - f * y + g * abs(x)
     except Exception as e:
@@ -36,9 +36,9 @@ def top_z(x, y, a=0, c=0.0, f=0.2, g=-0.8, h=1.7, i=0.45, j=0.17, q=2.5, s=0.5):
         raise e
 
 # bottom surface, characterized by the `term` variable which models the z difference
-def bottom_z(x, y, a=0, c=0.0, f=0.2, g=-0.8, h=1.7, i=0.45, j=0.17, q=2.5, s=0.5):
+def bottom_z(x, y, a=0, c=0.0, f=0, g=-0.8, h=1.7, i=0.45, j=0.17, q=2.5, s=0.5):
     term = (y + q * x**2 + s * abs(x)) * (h * x**2 - i * y + j)
-    return top_z(x, y) + term
+    return top_z(x, y, a, c, f, g, h, i, j, q, s) + term
 
 # Make the approximation that the gradients of the top surface approximate the bottom faces
 # You can use gradients in the meshing process to assign more cells to regions of high curvature, but
@@ -350,7 +350,7 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
 
     return faces, total_points, row_lengths
 
-def write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h, i, j, q, s, priority_scale = [1, 5]):
+def write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h, i, j, q, s, plot_points=False):
     """
     Write the points and faces to a VTK file.
 
@@ -385,8 +385,9 @@ def write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h
             for point in row:
                 z = top_z(point[0], point[1], a, c, f_param, g, h, i, j, q, s)
                 f.write(f"{point[0]} {point[1]} {z}\n")
-                ps.append([point[0], point[1], z])
-                pst.append([point[0], point[1], z])
+
+                if plot_points:
+                    pst.append([point[0], point[1], z])
 
         # write back surface
         for row in points:
@@ -394,24 +395,22 @@ def write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h
             for point in row[1:-1]:     # exclude boundary points
                 z = bottom_z(point[0], point[1], a, c, f_param, g, h, i, j, q, s)
                 f.write(f"{float(point[0])} {float(point[1])} {float(z)}\n")
-                ps.append([point[0], point[1], z])
-                psb.append([point[0], point[1], z])
+            
+                if plot_points:
+                    psb.append([point[0], point[1], z])
 
-        print(pst)
-        print(psb)
-
-        # plot the points in 3D with matplotlib
-        ps = np.array(ps)
-        pst = np.array(pst)
-        psb = np.array(psb)
-        fig = plt.figure(figsize=(10, 6))
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(pst[:, 0], pst[:, 1], pst[:, 2], c='r', marker='o')
-        ax.scatter(psb[:, 0], psb[:, 1], psb[:, 2], c='g', marker='o')
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        plt.show()
+        if plot_points:
+            # plot the points in 3D with matplotlib
+            pst = np.array(pst)
+            psb = np.array(psb)
+            fig = plt.figure(figsize=(10, 6))
+            ax = fig.add_subplot(111, projection='3d')
+            ax.scatter(pst[:, 0], pst[:, 1], pst[:, 2], c='r', marker='o')
+            ax.scatter(psb[:, 0], psb[:, 1], psb[:, 2], c='g', marker='o')
+            ax.set_xlabel('X')
+            ax.set_ylabel('Y')
+            ax.set_zlabel('Z')
+            plt.show()
 
         # write faces
         f.write(f"POLYGONS {len(faces)} {len(faces) * 4}\n")
@@ -423,32 +422,47 @@ def write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h
         f.write("SCALARS Components int\n")
         f.write("LOOKUP_TABLE default\n")
 
-        # loop over faces and assign priorities (randomly chose y = -0.5 to gauge)
-        max_dist = solve_for_x(-0.5, q, s) / 2
-        min_dist = solve_for_x(-0.5, q, s) / 8
-
-        # create a list of thresholds, interpolates between min and max distances
-        thresholds = np.linspace(min_dist, max_dist, priority_scale[1] - priority_scale[0] + 1)
-
         for face in faces:
             # just use the first point in the face to determine priority
             distance = face[3]
 
             # find the priority
-            priority = 0
-            for idx, thresh in enumerate(thresholds):
-                if distance < thresh:
-                    priority = idx + priority_scale[0]
-                    break
+            if distance < 0.01:
+                priority = 3
+            else:
+                priority = 1
 
             f.write(f"           {priority}\n")
+
+def generate_mesh(a, c, f, g, h, i, j, q, s, dy, initial_N, filename):
+    """
+    Generate a full hypersonic waverider mesh given the surface parameters and meshing parameters.
+
+    Parameters:
+    - a, c, f, g, h, i, j, q, s: Parameters for the surface.
+    - dy: Step size in y for each row.
+    - initial_N: Number of points in the first row (y = -1).
+    - filename: Name of the VTK file to write to.
+
+    Returns:
+    - success (boolean): Whether the mesh was generated successfully.
+    """
+
+    try:
+        points = generate_points(q, s, dy, initial_N)
+        faces, total_points, row_lengths = generate_faces(points, a, c, f, g, h, i, j, q, s)
+        write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h, i, j, q, s)
+        return True
+    except Exception as e:
+        print(e)
+        return False
         
 
 def main():
 
     a = 0
     c = 0.0
-    f = 0.2
+    f = 0
     g = -0.8
     h = 1.7
     i = 0.45
@@ -486,10 +500,10 @@ def main():
 
     faces, total_points, row_lengths = generate_faces(points, a, c, f, g, h, i, j, q, s)
 
-    write_file(points, faces, total_points, row_lengths, "output.vtk", a, c, f, g, h, i, j, q, s)
+    write_file(points, faces, total_points, row_lengths, "output.vtk", a, c, f, g, h, i, j, q, s, plot_points=True)
 
     mesh = pv.read("output.vtk")
-    mesh.plot_normals(mag=0.2, color='black')
+    mesh.plot_normals(mag=0.1, color='black')
 
 if __name__ == "__main__":
     main()
