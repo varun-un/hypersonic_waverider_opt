@@ -5,8 +5,10 @@ alternative is scipy.optimize.minimize with COBYLA
 """
 
 import trajectory as tj
+from volume import find_x_bounds
 import numpy as np
 import pyvista as pv
+import bpy
 from skopt import gp_minimize       # BO w/ Gaussian Process & RBF (allegedly better than Random Forest)
 
 def get_i(params):
@@ -63,214 +65,118 @@ def generate_vtk(geometry_params):
     """
     a, c, f, g, h, i, j, q, s = geometry_params
 
-    # Define grid resolution
-    num_x = 10  # Number of points along x
-    num_y = 10  # Number of points along y
+    X_POINTS = 10
+    Y_POINTS = 10
 
-    filename = "waverider.vtk"
+    # Top surface function
+    def top_surface(x, y):
+        return a * x**4 + c * x**2 - f * y + g * np.abs(x)
 
-    # ==============================
-    # 1. Parameter Definition and Domain Setup
-    # ==============================
+    # Bottom surface function
+    def bottom_surface(x, y):
+        term1 = a * x**4 + c * x**2 - f * y + g * np.abs(x)
+        term2 = (y + q * x**2 + s * np.abs(x)) * (h * x**2 - i * y + j)
+        return term1 + term2
 
-    # Compute x_max by solving q*x^2 + s*|x| = 1
-    if q == 0 and s != 0:
-        x_pos = 1 / s
-        x_neg = -1 / s
-        x_max = max(abs(x_pos), abs(x_neg))
-        x_min = -x_max
-    elif q != 0:
-        discriminant = s**2 + 4 * q
-        if discriminant < 0:
-            raise ValueError("Discriminant is negative. No real solutions for x_max.")
-        x_pos = (-s + np.sqrt(discriminant)) / (2 * q)
-        x_neg = (s + np.sqrt(discriminant)) / (2 * q)
-        x_max = max(abs(x_pos), abs(x_neg))
-        x_min = -x_max
-    else:
-        raise ValueError("Both q and s cannot be zero, leading to non-finite bounds.")
+    # Domain functions
+    def domain_boundary(x):
+        return -q * x**2 - s * np.abs(x)
+    
+    # Define the range of x values for the domain
+    x_min, x_max = find_x_bounds(q, s)
+    num_points = 10  # Number of points along the edge (set N as needed)
+    x_edge = np.linspace(x_min, x_max, num_points)
 
-    # Define x array
-    x = np.linspace(x_min, x_max, num_x)
+    # Compute y values along the intersection edge y = -q*x^2 - s*abs(x)
+    y_edge = domain_boundary(x_edge)
 
-    # Compute Y_max for all x to determine y_min
-    Y_max = 0
-    y_min = -1
-    dy = (0 - y_min) / (num_y - 1)  # Step size
-    y_max = Y_max + dy  # Slightly above -1 to include points where Y > -1
+    # Compute z values on the top and bottom surfaces along the edge
+    z_top_edge = top_surface(x_edge, y_edge)
+    z_bottom_edge = bottom_surface(x_edge, y_edge)
 
-    # Define y array from y_min to y_max
-    y = np.linspace(y_min, y_max, num_y)
+    y_back = -1
+    x_back = np.linspace(x_min, x_max, num_points)
 
-    # Create meshgrid for x and y
-    X, Y = np.meshgrid(x, y)
+    # Compute z values on the top and bottom surfaces at y = -1
+    z_top_back = top_surface(x_back, y_back)
+    z_bottom_back = bottom_surface(x_back, y_back)
 
-    # Compute mask: y <= Y_max(x) and y > -1
-    mask = (Y <= -q * X**2 - s * np.abs(X)) & (Y > -1)
+    # Create mesh grids for x and y within the domain
+    x_vals = np.linspace(x_min, x_max, X_POINTS)  # Number of x points
+    y_vals = np.linspace(y_back, y_edge.min(), Y_POINTS)  # Number of y points
 
-    # Debug statements
-    print(f"x_min: {x_min}, x_max: {x_max}")
-    print(f"y_min: {y_min}, y_max: {y_max}")
-    print(f"Number of masked points: {np.sum(mask)}")
+    print(x_vals)
+    print(y_vals)
 
-    # ==============================
-    # 2. Point Generation for Top and Bottom Surfaces
-    # ==============================
+    X, Y = np.meshgrid(x_vals, y_vals)
 
-    # Compute Z for top and bottom surfaces
-    Z_top = a * X**4 + c * X**2 - f * Y + g * np.abs(X)
-    Z_bottom = Z_top + (Y + q * X**2 + s * np.abs(X)) * (h * X**2 - i * Y + j)
+    # Flatten the arrays for processing
+    X_flat = X.flatten()
+    Y_flat = Y.flatten()
 
-    # Initialize lists to collect points and their indices
-    points = []
-    point_indices = -np.ones((num_y, num_x, 2), dtype=int)  # [i,j,0] top, [i,j,1] bottom
+    # Compute Z values for the top and bottom surfaces
+    Z_top = top_surface(X_flat, Y_flat)
+    Z_bottom = bottom_surface(X_flat, Y_flat)
 
-    current_index = 0
-    for i in range(num_y):
-        for j in range(num_x):
-            if mask[i, j]:
+    # Stack the coordinates
+    points_top = np.vstack((X_flat, Y_flat, Z_top)).T
+    points_bottom = np.vstack((X_flat, Y_flat, Z_bottom)).T
 
-                print(f"({X[i, j]:.4f}, {Y[i, j]:.4f}, {Z_top[i, j]:.4f})")
-                # Top point
-                points.append([X[i, j], Y[i, j], Z_top[i, j]])
-                point_indices[i, j, 0] = current_index
-                current_index += 1
-                # Bottom point
-                points.append([X[i, j], Y[i, j], Z_bottom[i, j]])
-                point_indices[i, j, 1] = current_index
-                current_index += 1
+    # Determine the number of cells in x and y directions
+    n_cells_x = X_POINTS - 1
+    n_cells_y = Y_POINTS - 1
+    n_cells = n_cells_x * n_cells_y
 
-    if not points:
-        raise ValueError("No points generated. Check parameter ranges and mask conditions.")
-
-    # Convert points to NumPy array
-    points = np.array(points)
-
-    # ==============================
-    # 3. Point Generation for the Back Surface
-    # ==============================
-
-    # At y = -1, define back surface points
-    z_back_top = a * x**4 + c * x**2 - f * (-1) + g * np.abs(x)
-    z_back_bottom = z_back_top + ((-1) + q * x**2 + s * np.abs(x)) * (h * x**2 - i * (-1) + j)
-
-    # Create back surface points (two points per x: top and bottom)
-    back_points = np.column_stack((x, np.full_like(x, -1), z_back_top)).tolist()
-    back_points += np.column_stack((x, np.full_like(x, -1), z_back_bottom)).tolist()
-
-    back_points = np.array(back_points)
-
-    # Append back_points to points
-    all_points = np.vstack([points, back_points])
-
-    # Assign indices to back surface points
-    back_start_idx = len(points)
-    back_indices_top = np.arange(back_start_idx, back_start_idx + num_x)
-    back_indices_bottom = np.arange(back_start_idx + num_x, back_start_idx + 2 * num_x)
-
-    # ==============================
-    # 4. Connectivity and Face Generation
-    # ==============================
-
+    # Initialize lists to hold cell definitions
     faces = []
 
-    # Helper function to add a triangle to faces
-    def add_triangle(p1, p2, p3):
-        return [3, p1, p2, p3]
+    # Build faces for the top surface
+    for i in range(n_cells_y):
+        for j in range(n_cells_x):
+            idx = i * X_POINTS + j
+            face = [4,  # Number of points in the face (quad)
+                    idx,
+                    idx + 1,
+                    idx + X_POINTS + 1,
+                    idx + X_POINTS]
+            faces.extend(face)
 
-    # Top and Bottom Surface Faces
-    for i in range(num_y - 1):
-        for j in range(num_x - 1):
-            if mask[i, j] and mask[i, j + 1] and mask[i + 1, j] and mask[i + 1, j + 1]:
-                # Indices for top and bottom points
-                idx_top_current = point_indices[i, j, 0]
-                idx_bottom_current = point_indices[i, j, 1]
-                idx_top_right = point_indices[i, j + 1, 0]
-                idx_bottom_right = point_indices[i, j + 1, 1]
-                idx_top_next = point_indices[i + 1, j, 0]
-                idx_bottom_next = point_indices[i + 1, j, 1]
+    # Convert to numpy array
+    faces = np.array(faces)
 
-                # Ensure indices are valid
-                if -1 not in [idx_top_current, idx_bottom_current, idx_top_right, idx_bottom_right, idx_top_next, idx_bottom_next]:
-                    # Create two triangles for each quad cell
-                    faces.append(add_triangle(idx_top_current, idx_top_right, idx_bottom_right))
-                    faces.append(add_triangle(idx_top_current, idx_bottom_right, idx_bottom_current))
-                    faces.append(add_triangle(idx_top_current, idx_bottom_current, idx_bottom_next))
-                    faces.append(add_triangle(idx_top_current, idx_bottom_next, idx_top_next))
 
-    # Back Surface Faces
-    for j in range(num_x - 1):
-        # Indices for back surface triangles
-        idx_back_top_current = back_indices_top[j]
-        idx_back_top_next = back_indices_top[j + 1]
-        idx_back_bottom_current = back_indices_bottom[j]
-        idx_back_bottom_next = back_indices_bottom[j + 1]
+    # Create PyVista mesh for the top surface
+    mesh_top = pv.PolyData()
+    mesh_top.points = points_top
+    mesh_top.faces = faces
 
-        # Create two triangles for each quad cell at the back
-        faces.append(add_triangle(idx_back_top_current, idx_back_top_next, idx_back_bottom_next))
-        faces.append(add_triangle(idx_back_top_current, idx_back_bottom_next, idx_back_bottom_current))
+    # Similarly for the bottom surface
+    mesh_bottom = pv.PolyData()
+    mesh_bottom.points = points_bottom
+    mesh_bottom.faces = faces
 
-    # Side Surfaces (Left and Right)
-    for i in range(num_y - 1):
-        # Left Side (x_min)
-        j = 0
-        if mask[i, j] and mask[i + 1, j]:
-            idx_top_current = point_indices[i, j, 0]
-            idx_bottom_current = point_indices[i, j, 1]
-            idx_top_next = point_indices[i + 1, j, 0]
-            idx_bottom_next = point_indices[i + 1, j, 1]
+    # Combine top and bottom meshes
+    combined_mesh = mesh_top.merge(mesh_bottom)
 
-            if -1 not in [idx_top_current, idx_bottom_current, idx_top_next, idx_bottom_next]:
-                faces.append(add_triangle(idx_top_current, idx_top_next, idx_bottom_next))
-                faces.append(add_triangle(idx_top_current, idx_bottom_next, idx_bottom_current))
+    # Add the back surface (plane at y = -1)
+    back_plane_points = np.vstack((x_back, y_back * np.ones_like(x_back), z_top_back)).T
+    back_plane = pv.PolyData(back_plane_points)
 
-        # Right Side (x_max)
-        j = num_x - 1
-        if mask[i, j] and mask[i + 1, j]:
-            idx_top_current = point_indices[i, j, 0]
-            idx_bottom_current = point_indices[i, j, 1]
-            idx_top_next = point_indices[i + 1, j, 0]
-            idx_bottom_next = point_indices[i + 1, j, 1]
+    # Assuming the back plane is connected appropriately
+    combined_mesh = combined_mesh.merge(back_plane)
 
-            if -1 not in [idx_top_current, idx_bottom_current, idx_top_next, idx_bottom_next]:
-                faces.append(add_triangle(idx_top_current, idx_bottom_current, idx_bottom_next))
-                faces.append(add_triangle(idx_top_current, idx_bottom_next, idx_top_next))
+    # Perform mesh cleaning operations if necessary
+    combined_mesh.clean(inplace=True)
 
-    # ==============================
-    # 5. Mesh Assembly and Validation
-    # ==============================
+    combined_mesh.plot(show_edges=True)
 
-    if not faces:
-        raise ValueError("No faces generated. Check connectivity conditions.")
+    # Save the mesh
+    combined_mesh.save('waverider.vtk')
 
-    # Convert faces list to a flat array
-    faces_flat = np.hstack(faces)
 
-    # Create the PolyData mesh
-    mesh = pv.PolyData(all_points, faces_flat)
 
-    # Check mesh integrity
-    if not mesh.is_manifold:
-        print("Warning: The mesh is not manifold. Some edges may not be properly connected.")
-    else:
-        print("Mesh is manifold.")
 
-    # Clean the mesh to remove any duplicate points or unused points
-    mesh = mesh.clean()
 
-    # ==============================
-    # 6. Visualization and Export
-    # ==============================
-
-    # Optional: Visualize the mesh to verify
-    plotter = pv.Plotter()
-    plotter.add_mesh(mesh, show_edges=True, color='lightblue')
-    plotter.add_axes()
-    plotter.show()
-
-    # Export the mesh to a VTK file
-    mesh.save(filename)
-    print(f"VTK mesh '{filename}' has been successfully created.")
 
 
 
