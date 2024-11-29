@@ -151,7 +151,8 @@ def generate_points(q, s, dy, initial_N, y_min=-1, y_max=0, append_origin=False)
 
 
     # first row has two last points, so fix that
-    points_list[0] = points_list[0][:-1]
+    if initial_N % 2 == 1:
+        points_list[0] = points_list[0][:-1]
 
 
     return points_list
@@ -212,6 +213,7 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
         current_num_points += len(row)
 
     total_points = row_lengths[-1] + len(points[-1])
+    print(points, "YEEE", total_points)
 
     faces = []
 
@@ -231,7 +233,7 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
                 above = row_lengths[row_idx + 1] + j
                 right = cur + 1
 
-                faces.append((cur, above, right, distances[row_idx][i]))
+                faces.append((above, cur, right, distances[row_idx][i]))
 
                 i += 1
 
@@ -241,89 +243,100 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
                 above_left = row_lengths[row_idx + 1] + j
                 above = above_left + 1
 
-                faces.append((cur, above_left, above, distances[row_idx][i]))
+                faces.append((above_left, cur, above, distances[row_idx][i]))
 
                 j += 1      # okay to increment, since right-moving triangle condition is >=
 
     # mesh the bottom surface
     # we will use the same logic as the top surface, but with the bottom surface function
     # point indicies will be offset by the number of points in the top surface, while also accounting for boundary points
-    # for row_idx, row in enumerate(points[:-1]):         # loop over all but the last row (origin)
+    for row_idx, row in enumerate(points[:-1]):         # loop over all but the last row (origin)
 
-    #     i = 0       # this row
-    #     j = 0       # next row
-    #     while (i < len(row) - 1 and len(points[row_idx + 1]) < len(row)) or (i <= len(row) - 1 and len(points[row_idx + 1]) == len(row)):
+        i = 0       # this row
+        j = 0       # next row
+        while (i < len(row) - 1 and len(points[row_idx + 1]) < len(row)) or (i <= len(row) - 1 and j < len(points[row_idx + 1]) - 1 and len(points[row_idx + 1]) == len(row)):
+            # if we are referring vertical points, or there are no more points in the next row, we create right-moving triangles
+            if j >= i or j >= len(points[row_idx + 1]) - 1:
+                # create a triangular face with this point, the next row's point, and the next point in this row
 
-    #         # if we are referring vertical points, or there are no more points in the next row, we create right-moving triangles
-    #         if j >= i or j >= len(points[row_idx + 1]) - 1:
-    #             # create a triangualr face with this point, the next row's point, and the next point in this row
+                if i == 0 or i == len(row) - 1:  # boundary point
+                    cur = row_lengths[row_idx] + i
+                else:
+                    prev_boundaries = 2 * (row_idx + 1) - 1
+                    cur = row_lengths[row_idx] + i + total_points - prev_boundaries
 
-    #             if i == 0 or i == len(row) - 1:  # boundary point
-    #                 cur = row_lengths[row_idx] + i
-    #             else:
-    #                 cur = row_lengths[row_idx] + i + total_points
+                if j == 0 or j == len(points[row_idx + 1]) - 1:  # boundary point
+                    above = row_lengths[row_idx + 1] + j
+                else:
+                    prev_boundaries = 2 * (row_idx + 2) - 1
+                    above = row_lengths[row_idx + 1] + j + total_points - prev_boundaries
 
-    #             if j == 0 or j == len(points[row_idx + 1]) - 1:  # boundary point
-    #                 above = row_lengths[row_idx + 1] + j
-    #             else:
-    #                 above = row_lengths[row_idx + 1] + j + total_points
+                if i >= len(row) - 2:
+                    right = row_lengths[row_idx] + i + 1         # right point is boundary point
+                else:
+                    if i == 0:      # cur is a boundary point
+                        prev_boundaries = 2 * (row_idx + 1) - 1
+                        right= cur + 1 + total_points - prev_boundaries
+                    else:
+                        right = cur + 1 + total_points
 
-    #             if i == len(row) - 2:
-    #                 right = cur + 1         # right point is boundary point
-    #             else:
-    #                 right = cur + 1 + total_points
+                faces.append((above, cur, right, distances[row_idx][i]))
 
-    #             faces.append((cur, above, right, distances[row_idx][i]))
+                i += 1
 
-    #             i += 1
+            else:       # left-moving triangles
+                # create a triangular face with this point, the next row's point, and the next point in the next row
 
-    #         else:       # left-moving triangles
-    #             # create a triangular face with this point, the next row's point, and the next point in the next row
+                if i == 0 or i == len(row) - 1:  # boundary point
+                    cur = row_lengths[row_idx] + i
+                else:
+                    prev_boundaries = 2 * (row_idx + 1) - 1
+                    cur = row_lengths[row_idx] + i + total_points - prev_boundaries
 
-    #             if i == 0 or i == len(row) - 1:  # boundary point
-    #                 cur = row_lengths[row_idx] + i
-    #             else:
-    #                 cur = row_lengths[row_idx] + i + total_points
+                if j == 0 or j == len(points[row_idx + 1]) - 1:  # boundary point
+                    above_left = row_lengths[row_idx + 1] + j
+                else:
+                    prev_boundaries = 2 * (row_idx + 2) - 1
+                    above_left = row_lengths[row_idx + 1] + j + total_points - prev_boundaries
 
-    #             if j == 0 or j == len(points[row_idx + 1]) - 1:  # boundary point
-    #                 above_left = row_lengths[row_idx + 1] + j
-    #             else:
-    #                 above_left = row_lengths[row_idx + 1] + j + total_points
+                if j == len(points[row_idx + 1]) - 2:
+                    above = row_lengths[row_idx + 1] + j + 1      # above point is boundary point
+                else:
+                    if j == 0 or j == len(points[row_idx + 1]) - 1:     # above left is a boundary point
+                        prev_boundaries = 2 * (row_idx + 2) - 1
+                        above = above_left + 1 + total_points - prev_boundaries
+                    else:
+                        above = above_left + 1
 
-    #             if j == len(points[row_idx + 1]) - 2:
-    #                 above = above_left + 1      # above point is boundary point
-    #             else:
-    #                 above = above_left + 1 + total_points
+                faces.append((above_left, cur, above, distances[row_idx][i]))
 
-    #             faces.append((cur, above_left, above, distances[row_idx][i]))
+                j += 1      # okay to increment, since right-moving triangle condition is >=
 
-    #             j += 1      # okay to increment, since right-moving triangle condition is >=
+    # mesh the back surface
+    # back surface is just a plane, connecting the first row for top and bottom surfaces
+    jdx = 0
+    idx = 0
+    x_max = solve_for_x(-1, q, s)
+    while idx < len(points[0]) - 1:
 
-    # # mesh the back surface
-    # # back surface is just a plane, connecting the first row for top and bottom surfaces
-    # jdx = 0
-    # idx = 0
-    # x_max = solve_for_x(-1, q, s)
-    # while idx < len(points[0]) - 1:
+        # get distance
+        dist = x_max - np.abs(points[0][idx][0])
 
-    #     # get distance
-    #     dist = x_max - np.abs(points[0][idx][0])
-
-    #     if idx == 0 and jdx == 0:       # left corner
-    #         faces.append((idx, idx + 1, jdx + 1 + total_points, dist))
-    #         idx += 1
-    #         jdx += 1
-    #     elif idx == len(points[0]) - 2 and jdx == len(points[0]) - 2:        # right corner
-    #         faces.append((idx, jdx + total_points, idx + 1, dist))
-    #         idx += 1
-    #         jdx += 1
-    #         break
-    #     elif idx == jdx:        # right up facing triangle
-    #         faces.append((idx, idx + 1, jdx + total_points, dist))
-    #         idx += 1
-    #     elif jdx < idx:         # left down facing triangle
-    #         faces.append((idx, jdx + total_points, jdx + 1 + total_points, dist))
-    #         jdx += 1
+        if idx == 0 and jdx == 0:       # left corner
+            faces.append((idx + 1, idx, jdx + total_points, dist))
+            idx += 1
+            jdx += 1
+        elif idx == len(points[0]) - 2 and jdx == len(points[0]) - 2:        # right corner
+            faces.append((jdx + total_points - 1, idx, idx + 1, dist))
+            idx += 1
+            jdx += 1
+            break
+        elif idx == jdx:        # right up facing triangle
+            faces.append((idx + 1, idx, jdx + total_points, dist))
+            idx += 1
+        elif jdx < idx:         # left down facing triangle
+            faces.append((jdx + total_points, idx, jdx + 1 + total_points, dist))
+            jdx += 1
 
     return faces, total_points, row_lengths
 
@@ -351,7 +364,7 @@ def write_file(points, faces, total_points, row_lengths, filename, a, c, f, g, h
         f.write("DATASET POLYDATA\n")
 
         # for top and bottom surfaces, but remove boundary points for back surface
-        abs_tot_points = total_points * 2 - 2 * (len(row_lengths) - 1)
+        abs_tot_points = total_points * 2 - 2 * (len(row_lengths) - 1) - 1      # minus 1 at end bc origin row only has 1 boundary
 
         # write points
         f.write(f"POINTS {abs_tot_points} float\n")
@@ -434,7 +447,7 @@ def main():
     s = 0.5
 
     dy = 0.5
-    initial_N = 3
+    initial_N = 4
     y_min = -1.0
     y_max = 0.0
     
@@ -466,7 +479,7 @@ def main():
     write_file(points, faces, total_points, row_lengths, "output.vtk", a, c, f, g, h, i, j, q, s)
 
     mesh = pv.read("output.vtk")
-    mesh.plot(show_edges=True, show_grid=True)
+    mesh.plot_normals(mag=0.2, color='black')
 
 if __name__ == "__main__":
     main()
