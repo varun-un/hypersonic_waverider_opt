@@ -64,10 +64,6 @@ def find_x_bounds(q, s):
     else:
         raise ValueError("Both q and s cannot be zero, non-finite bounds.")
 
-x_min, x_max = find_x_bounds(q, s)
-print(f"Integration bounds for x: from {x_min:.6f} to {x_max:.6f}")
-print(f"Integration bounds for x: from {x_min:.6f} to {x_max:.6f}")
-
 
 # Get y as a function of x
 def y_lower(x):
@@ -77,19 +73,6 @@ def y_upper(x):
     return -q * x**2 - s * abs(x)
 
 # note - ensure y_upper > y_lower for all x in [x_min, x_max]
-
-try:
-    volume, error = dblquad(
-        integrand,
-        x_min,      # Lower limit for x
-        x_max,      # Upper limit for x
-        y_lower,    # Lower limit for y as a function of x
-        y_upper     # Upper limit for y as a function of x
-    )
-    print(f"Calculated Volume: {volume:.6f} cubic units")
-    print(f"Estimated Integration Error: {error:.6e}")
-except Exception as e:
-    print(f"Error during integration: {e}")
 
 
 
@@ -114,6 +97,26 @@ def analytical_volume(h, i, j, q, s):
 
     return V
 
-analytical_volume = analytical_volume(h, i, j, q, s)
+if "__name__" == "__main__":
 
-print(f"Analytical Volume: {analytical_volume:.6f} cubic units")
+        
+    x_min, x_max = find_x_bounds(q, s)
+    print(f"Integration bounds for x: from {x_min:.6f} to {x_max:.6f}")
+    print(f"Integration bounds for x: from {x_min:.6f} to {x_max:.6f}")
+
+    try:
+        volume, error = dblquad(
+            integrand,
+            x_min,      # Lower limit for x
+            x_max,      # Upper limit for x
+            y_lower,    # Lower limit for y as a function of x
+            y_upper     # Upper limit for y as a function of x
+        )
+        print(f"Calculated Volume: {volume:.6f} cubic units")
+        print(f"Estimated Integration Error: {error:.6e}")
+    except Exception as e:
+        print(f"Error during integration: {e}")
+
+    analytical_volume = analytical_volume(h, i, j, q, s)
+
+    print(f"Analytical Volume: {analytical_volume:.6f} cubic units")

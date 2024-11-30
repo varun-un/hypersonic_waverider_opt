@@ -5,7 +5,7 @@ alternative is scipy.optimize.minimize with COBYLA
 """
 
 import trajectory as tj
-from volume import find_x_bounds
+from volume import find_x_bounds, analytical_volume
 from mesher import generate_mesh
 import numpy as np
 from skopt import gp_minimize       # BO w/ Gaussian Process & RBF
@@ -15,11 +15,14 @@ from skopt.callbacks import CheckpointSaver
 import os
 import subprocess
 import time
+import dill
 
 MASS = 25
 INITIAL_ALT = 40000.0  # meters (40 km)
 INITIAL_M = 10.0      # Mach number
 GEOMETRY_LENGTH = 1.0  # meters
+
+PENALTY = 1e10
 
 
 def get_i(params):
@@ -149,6 +152,17 @@ def run_cfd(vtk_filename):
     except Exception as ex:
         print(f"An unexpected error occurred: {ex}")
         return np.inf, np.inf
+    
+
+def run_cfdA(vtk_filename):
+
+    lift = np.random.uniform(10, 500)
+
+    drag = np.random.uniform(250, 1000)
+
+    print(f"Lift: {lift}, Drag: {drag}")
+
+    return lift, drag
 
 
 def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.vtk"):
@@ -166,21 +180,30 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
 
     Returns:
         cost: The computed cost of the trajectory. This is the negative of the distance travelled.
+              If geometry is invalid, returns a penalized cost, dependent on deviation from constrained volume.
     """
 
     i = get_i(params)
 
     if i is None:
-        return np.inf - 1
+
+        # Let i be 0.5 if it cannot be determined
+        i = 0.5
+        volume = analytical_volume(params[4], i, params[5], params[6], params[7])
+
+        # Penalize the cost based on the deviation from the constrained volume
+        penalty = np.abs(volume - 0.01) * PENALTY
+
+        return penalty
 
     valid = generate_mesh(a, c, f, g, h, i, j, q, s, dy, initial_N, filename)
     if not valid:
-        return np.inf - 1
+        return PENALTY
 
     # ------ Run CFD ------
     lift, drag = run_cfd(filename)
     if lift == np.inf or drag == np.inf:
-        return np.inf - 1
+        return PENALTY
 
     # calculate reference area (area between y = -qx^2 -s|x| and y = -1)
     _, x_max = find_x_bounds(q, s)
@@ -213,11 +236,12 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
 
     return -1 * cost
 
+
 if __name__ == "__main__":
 
     a = 0
     c = 0.0
-    f = 0.2
+    f = 0
     g = -0.8
     h = 1.7
     i = 0.45
@@ -225,11 +249,10 @@ if __name__ == "__main__":
     q = 0
     s = 1.84
 
-    # Define the parameter space
+    # Define the parameter space    (exclude f and i)
     space = [
         Real(-10.0, 10.0, name='a'),
         Real(-10.0, 10.0, name='c'),
-        Real(0.0, 0.0, name='f'),           # restrict f to 0 to get 0 angle of attack
         Real(-5.0, 5.0, name='g'),
         Real(0.0, 15.0, name='h'),
         Real(0.0, 2.0, name='j'),
@@ -246,18 +269,22 @@ if __name__ == "__main__":
     # filename to save the VTK file to
     filename = "../generated_waverider.vtk"
 
-    cost_fcn_partial = lambda x: cost_fcn(x, dy, initial_N, timestep, filename)       # partial function to pass to gp_minimize
+    def cost_fcn_partial(x):
+        print(f"Running cost function with parameters: {x}")
+        mmm = cost_fcn([x[0], x[1], f, x[2], x[3], x[4], x[5], x[6]], dy, initial_N, timestep, filename)
+
+        return mmm
 
     pkl_name = f"./outputs/bo_{time.time()}.pkl"
-    checkpoint_saver = CheckpointSaver("./outputs/bo_checkpoint.pkl", compress=3)
+    checkpoint_saver = CheckpointSaver(pkl_name, compress=3)
 
     # Run Bayesian Optimization
     result = gp_minimize(
-        x0=[a, c, f, g, h, j, q, s],        # Initial guess
+        x0=[a, c, g, h, j, q, s],        # Initial guess
         func=cost_fcn_partial,              # Objective function to minimize
         dimensions=space,                   # Search space
         acq_func="EI",                      # Acquisition function
-        n_calls=50,                         # Total number of evaluations
+        n_calls=20,                         # Total number of evaluations
         n_initial_points=5,                 # Initial random evaluations
         random_state=1,                     # Seed for reproducibility
         callback=[checkpoint_saver],        # Save progress

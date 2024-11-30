@@ -219,7 +219,6 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         # Get lift and drag forces
         F_L, F_D = get_lift_drag(current_speed, altitude, geometry_length, S, **kwargs)
         
-        
         # use vector dynamics to decompose and calculate forces
         if current_speed != 0:
             F_Dx = -F_D * (Vx / current_speed)
