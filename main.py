@@ -261,9 +261,9 @@ if __name__ == "__main__":
     ]
 
     # spacing in the y direction for meshing
-    dy = 0.05
+    dy = 0.01
     # max number of mesh vertices in the y=-1 row
-    initial_N = 22
+    initial_N = 102
     # timestep for trajectory simulation
     timestep = 1
     # filename to save the VTK file to
