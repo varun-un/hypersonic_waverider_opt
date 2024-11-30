@@ -11,7 +11,7 @@ g = -0.8
 h = 1.7
 i = 0.45
 j = 0.17
-q = 0
+q = 2.5
 s = 1.84
 
 # top surface
@@ -47,7 +47,7 @@ def find_x_bounds(q, s):
         x_pos = (-s + sqrt_discriminant) / (2 * q)
         
         # x < 0: qx^2 - sx -1 =0
-        x_neg = (-s - sqrt_discriminant) / (2 * q)
+        x_neg = -1 * x_pos
         
         if x_pos < 0 or x_neg > 0:
             raise ValueError("Invalid bounds computed. Check parameter values for q and s.")
