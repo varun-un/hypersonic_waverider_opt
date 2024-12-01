@@ -133,7 +133,7 @@ def get_cl_cd_SAlt(speed, altitude):
 
 
 # Lift and Drag Calculation
-def get_lift_drag(speed, altitude, geometry_length, S, **kwargs):
+def get_lift_drag(speed, altitude, geometry_length, S, back_area, **kwargs):
     """
     Calculate lift and drag forces based on speed and altitude.
     
@@ -142,6 +142,7 @@ def get_lift_drag(speed, altitude, geometry_length, S, **kwargs):
         altitude (float): Altitude in meters.
         geometry_length (float): Characteristic length of the geometry in meters.
         S (float): Reference area in m^2.
+        back_area (float): Area of the back surface in m^2.
         **kwargs: Additional keyword arguments to specify Cl and Cd directly.
                     Use `cl` and `cd` to pass the values.
     
@@ -171,11 +172,14 @@ def get_lift_drag(speed, altitude, geometry_length, S, **kwargs):
     # lift & drag formula
     F_L = C_L * q * S
     F_D = C_D * q * S
+
+    # add back pressure
+    F_D += back_area * atm['pressure']
     
     return F_L, F_D
 
 # Trajectory Simulation
-def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S, timestep=.01, verbose = False, **kwargs):
+def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S, back_area, timestep=.01, verbose = False, **kwargs):
     """
     Simulate the trajectory of the waverider until it reaches the ground.
     
@@ -185,6 +189,7 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         initial_mach (float): Initial Mach number.
         geometry_length (float): Characteristic length of the geometry in meters.
         S (float): Reference area in m^2.
+        back_area (float): Area of the back surface in m^2.
         timestep (float): Time step resolution in seconds.
         verbose (bool): Print simulation details.
         **kwargs: Additional keyword arguments to pass to get_lift_drag.
@@ -217,7 +222,7 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         current_speed = math.sqrt(Vx**2 + Vz**2)        # normalizing factor
         
         # Get lift and drag forces
-        F_L, F_D = get_lift_drag(current_speed, altitude, geometry_length, S, **kwargs)
+        F_L, F_D = get_lift_drag(current_speed, altitude, geometry_length, S, back_area, **kwargs)
         
         # use vector dynamics to decompose and calculate forces
         if current_speed != 0:

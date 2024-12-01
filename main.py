@@ -5,7 +5,7 @@ alternative is scipy.optimize.minimize with COBYLA
 """
 
 import trajectory as tj
-from volume import find_x_bounds, analytical_volume
+from volume import find_x_bounds, analytical_volume, back_area
 from mesher import generate_mesh
 import numpy as np
 from skopt import gp_minimize       # BO w/ Gaussian Process & RBF
@@ -185,11 +185,13 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
 
     i = get_i(params)
 
+    a, c, f, g, h, j, q, s = params
+
     if i is None:
 
         # Let i be 0.5 if it cannot be determined
         i = 0.5
-        volume = analytical_volume(params[4], i, params[5], params[6], params[7])
+        volume = analytical_volume(h, i, j, q, s)
 
         # Penalize the cost based on the deviation from the constrained volume
         penalty = np.abs(volume - 0.01) * PENALTY
@@ -232,7 +234,9 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
     c_l = lift / (dynamic_pressure * S)   # Dimensionless
     c_d = drag / (dynamic_pressure * S)   # Dimensionless
 
-    cost = tj.simulate_trajectory(MASS, INITIAL_ALT, INITIAL_M, GEOMETRY_LENGTH, S, timestep, cl=c_l, cd=c_d)
+    b_area = back_area(h, i, j, q, s)
+
+    cost = tj.simulate_trajectory(MASS, INITIAL_ALT, INITIAL_M, GEOMETRY_LENGTH, S, b_area, timestep, cl=c_l, cd=c_d)
 
     return -1 * cost
 
