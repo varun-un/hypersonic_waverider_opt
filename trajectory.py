@@ -174,7 +174,7 @@ def get_lift_drag(speed, altitude, geometry_length, S, back_area, **kwargs):
     F_D = C_D * q * S
 
     # add back pressure
-    F_D += back_area * atm['pressure']
+    F_D -= back_area * atm['pressure']
     
     return F_L, F_D
 
@@ -219,12 +219,20 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
     
     while altitude > 0:
 
+        # max out at circumference of earth
+        if x_position > 40075000:
+            print("Reached the circumference of the Earth. Exiting simulation.")
+            break
+
         current_speed = math.sqrt(Vx**2 + Vz**2)        # normalizing factor
         
         # Get lift and drag forces
         F_L, F_D = get_lift_drag(current_speed, altitude, geometry_length, S, back_area, **kwargs)
         
         # use vector dynamics to decompose and calculate forces
+        # in order to maintain 0 AoA as it falls, it will pitch to maintain 0 AoA, where it 
+        # faces the fresstream velocity vector, and lift is perpendicular to this
+        # in the global frame, use the velocity vector to decompose the forces
         if current_speed != 0:
             F_Dx = -F_D * (Vx / current_speed)
             F_Dz = -F_D * (Vz / current_speed)

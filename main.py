@@ -189,13 +189,18 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
 
     if i is None:
 
-        # Let i be 0.5 if it cannot be determined
-        i = 0.5
-        volume = analytical_volume(h, i, j, q, s)
+        try:
+            # Let i be 0.5 if it cannot be determined
+            i = 0.5
+            volume = analytical_volume(h, i, j, q, s)
 
-        # Penalize the cost based on the deviation from the constrained volume
-        penalty = np.abs(volume - 0.01) * PENALTY
+            # Penalize the cost based on the deviation from the constrained volume
+            penalty = np.abs(volume - 0.01) * PENALTY
 
+        except ValueError as ve:
+            print(f"Error: {ve}")
+            penalty = PENALTY
+        
         return penalty
 
     valid = generate_mesh(a, c, f, g, h, i, j, q, s, dy, initial_N, filename)
@@ -203,7 +208,7 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
         return PENALTY
 
     # ------ Run CFD ------
-    lift, drag = run_cfd(filename)
+    lift, drag = run_cfdA(filename)
     if lift == np.inf or drag == np.inf:
         return PENALTY
 
@@ -240,6 +245,23 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
 
     return -1 * cost
 
+def cost_fcn_partial(x):
+
+    # spacing in the y direction for meshing
+    dy = 0.01
+    # max number of mesh vertices in the y=-1 row
+    initial_N = 102
+    # timestep for trajectory simulation
+    timestep = 1
+    # filename to save the VTK file to
+    filename = "../generated_waverider.vtk"
+
+    
+    print(f"Running cost function with parameters: {x}")
+    mmm = cost_fcn([x[0], x[1], f, x[2], x[3], x[4], x[5], x[6]], dy, initial_N, timestep, filename)
+
+    return mmm
+
 
 if __name__ == "__main__":
 
@@ -264,22 +286,16 @@ if __name__ == "__main__":
         Real(0.0, 10.0, name='s')
     ]
 
-    # spacing in the y direction for meshing
-    dy = 0.01
-    # max number of mesh vertices in the y=-1 row
-    initial_N = 102
-    # timestep for trajectory simulation
-    timestep = 1
-    # filename to save the VTK file to
-    filename = "../generated_waverider.vtk"
+    # check above for meshing parameters
 
-    def cost_fcn_partial(x):
-        print(f"Running cost function with parameters: {x}")
-        mmm = cost_fcn([x[0], x[1], f, x[2], x[3], x[4], x[5], x[6]], dy, initial_N, timestep, filename)
+    cur_path = os.path.dirname(os.path.abspath(__file__))
+    output_folder = os.path.join(cur_path, "output")
+    output_folder = os.path.join(output_folder, f"{int(time.time())}")
 
-        return mmm
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
 
-    pkl_name = f"./outputs/bo_{time.time()}.pkl"
+    pkl_name = f"{output_folder}/bo_checkpoint.pkl"
     checkpoint_saver = CheckpointSaver(pkl_name, compress=3)
 
     # Run Bayesian Optimization
@@ -288,7 +304,7 @@ if __name__ == "__main__":
         func=cost_fcn_partial,              # Objective function to minimize
         dimensions=space,                   # Search space
         acq_func="EI",                      # Acquisition function
-        n_calls=20,                         # Total number of evaluations
+        n_calls=100,                         # Total number of evaluations
         n_initial_points=5,                 # Initial random evaluations
         random_state=1,                     # Seed for reproducibility
         callback=[checkpoint_saver],        # Save progress

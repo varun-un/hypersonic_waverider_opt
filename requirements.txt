@@ -3,3 +3,6 @@ matplotlib
 pyvista
 scipy
 scikit-optimize
+seaborn
+pandas
+joblib

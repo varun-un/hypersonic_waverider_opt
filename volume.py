@@ -69,7 +69,7 @@ def back_area(h, i, j, q, s):
     Analytically computes the area of the back surface of the solid defined by the given parameters.
     """
 
-    _, x_max = find_x_bounds(q, s)[1]
+    _, x_max = find_x_bounds(q, s)
 
     area = -(((30 * 0**2 - 30 * x_max**2) * s + (20 * 0**3 - 20 * x_max**3) * q - 60 * 0 + 60 * x_max) * i + ((30 * 0**2 - 30 * x_max**2) * j + (15 * 0**4 - 15 * x_max**4) * h) * s + ((20 * 0**3 - 20 * x_max**3) * j + (12 * 0**5 - 12 * x_max**5) * h) * q + (60 * x_max - 60 * 0) * j + (20 * x_max**3 - 20 * 0**3) * h) / 30
 
