@@ -222,9 +222,10 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
     GAMMA = 1.4               # Ratio of specific heats for air
     R = 287.05                # Specific gas constant for air, J/(kg·K)
     MACH_NUMBER = 7.0         # CFD Mach number
+    CFD_ALT = 30000.0         # meters (30 km)
 
     # Retrieve atmospheric properties
-    atm = tj.get_atm(INITIAL_ALT)
+    atm = tj.get_atm(CFD_ALT)
     temperature = atm['temperature']        # in Kelvin
     density = atm['density']                # in kg/m³
 
