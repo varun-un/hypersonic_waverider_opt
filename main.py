@@ -288,15 +288,15 @@ def cost_fcn_partial(x):
 
 if __name__ == "__main__":
 
-    a = 0
+    a = -0.3
     c = 0.0
     f = 0
-    g = -0.8
-    h = 1.7
-    i = 0.45
-    j = 0.17
+    g = 0.0
+    h = 0.0
+    i = 0.12
+    j = 0.0
     q = 0
-    s = 1.84
+    s = 3
 
     # Define the parameter space    (exclude f and i)
     space = [
