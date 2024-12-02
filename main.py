@@ -70,12 +70,14 @@ def get_i(params):
     
     return i
 
-def run_cfd(vtk_filename):
+def run_cfd(vtk_filename, drag_loc = -5, lift_loc = -4):
     """
     Runs the Champs solver on the given VTK file.
 
     Parameters:
         vtk_filename (str): Name of the VTK file to run the solver on.
+        drag_loc (int): Column index of the drag coefficient in the integrated_loads.dat file. By default, -5.
+        lift_loc (int): Column index of the lift coefficient in the integrated_loads.dat file. By default, -4.
 
     Returns:
         tuple: (lift, drag) coefficients from the simulation.
@@ -138,8 +140,8 @@ def run_cfd(vtk_filename):
             
             try:
                 # Extract drag and lift from the specified positions
-                drag = float(tokens[-5])
-                lift = float(tokens[-4])
+                drag = float(tokens[drag_loc]) * 2  # Multiply by 2 to get the total drag (runs half waverider)
+                lift = float(tokens[lift_loc]) * 2
                 print(f"Lift: {lift}, Drag: {drag}")
                 return lift, drag
             except ValueError as ve:
@@ -153,8 +155,17 @@ def run_cfd(vtk_filename):
         print(f"An unexpected error occurred: {ex}")
         return np.inf, np.inf
     
+def run_cfdJ(vtk_filename):
+    """
+    Version of run_cfd for John's system
+    """
+    return run_cfd(vtk_filename, -2, -1)
+    
 
 def run_cfdA(vtk_filename):
+    """
+    SITL test version
+    """
 
     lift = np.random.uniform(10, 500)
 
@@ -209,7 +220,7 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
         return PENALTY
 
     # ------ Run CFD ------
-    lift, drag = run_cfdA(filename)
+    lift, drag = run_cfdJ(filename)
     if lift == np.inf or drag == np.inf:
         return PENALTY
     
@@ -316,8 +327,8 @@ if __name__ == "__main__":
         func=cost_fcn_partial,              # Objective function to minimize
         dimensions=space,                   # Search space
         acq_func="EI",                      # Acquisition function
-        n_calls=25,                         # Total number of evaluations
-        n_initial_points=5,                 # Initial random evaluations
+        n_calls=10,                         # Total number of evaluations
+        n_initial_points=4,                 # Initial random evaluations
         random_state=1,                     # Seed for reproducibility
         callback=[checkpoint_saver],        # Save progress
         noise="gaussian",                   # Assume somewhat noisy observations
