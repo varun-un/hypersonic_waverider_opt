@@ -9,6 +9,7 @@ from ambiance import Atmosphere
 GAMMA = 1.4  
 R = 287.05  
 G = 9.81    
+MAX_ALT = 81020  # meters
 
 # ambiance library (ref PyPi) (uses 1993 Std Atm tables)
 def get_atm(altitude):
@@ -174,7 +175,8 @@ def get_lift_drag(speed, altitude, geometry_length, S, back_area, **kwargs):
     F_D = C_D * q * S
 
     # add back pressure
-    F_D -= back_area * atm['pressure']
+    a = math.sqrt(GAMMA * R * atm['temperature'])
+    F_D -= back_area * atm['pressure'] / (speed / a)
     
     return F_L, F_D
 
@@ -227,7 +229,7 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         current_speed = math.sqrt(Vx**2 + Vz**2)        # normalizing factor
         
         # Get lift and drag forces
-        F_L, F_D = get_lift_drag(current_speed, altitude, geometry_length, S, back_area, **kwargs)
+        F_L, F_D = get_lift_drag(current_speed, min(altitude, MAX_ALT), geometry_length, S, back_area, **kwargs)
         
         # use vector dynamics to decompose and calculate forces
         # in order to maintain 0 AoA as it falls, it will pitch to maintain 0 AoA, where it 
@@ -272,7 +274,7 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
             altitude = 0
         
         if verbose:
-            print(f"Time: {time_elapsed:.2f}s, X: {x_position:.2f}m, Altitude: {altitude:.2f}m, Vx: {Vx:.2f}m/s, Vz: {Vz:.2f}m/s")
+            print(f"Time: {time_elapsed:.3f}s, X: {x_position:.3f}m, Altitude: {altitude:.3f}m, Vx: {Vx:.3f}m/s, Vz: {Vz:.3f}m/s, Lift: {F_L:.3f}N, Drag: {F_D:.3f}N")
     
     return x_position
 
@@ -283,7 +285,7 @@ def single_shot():
     initial_mach = 10.0      # Mach number
     geometry_length = 1.0  # meters
     S = .3  # Reference Area (m^2)
-    timestep = 1          # seconds
+    timestep = 3          # seconds
     
     distance_traveled = simulate_trajectory(
         mass=mass,
@@ -292,10 +294,13 @@ def single_shot():
         geometry_length=geometry_length,
         S=S,
         timestep=timestep,
-        verbose=True
+        verbose=True,
+        back_area=0.01,
+        cl=0.5,
+        cd=0.3
     )
     
-    print(f"Total horizontal distance traveled: {distance_traveled:.2f} meters")
+    print(f"Total horizontal distance traveled: {distance_traveled:.3f} meters")
 
 # # https://docs.scipy.org/doc/scipy/reference/optimize.minimize-neldermead.html
 def optimize_geometry(current_params, params_domain, cost_function):

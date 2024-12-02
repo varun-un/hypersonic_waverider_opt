@@ -5,6 +5,7 @@
 # outputs if the folder name is a number
 output/[0-9]*/
 plots/
+out*.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
