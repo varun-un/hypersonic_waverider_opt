@@ -165,7 +165,7 @@ def run_cfdA(vtk_filename):
     return lift, drag
 
 
-def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.vtk"):
+def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.vtk", calc_tj=False):
     """
     Takes the 8-D parameter vector and computes the cost function. 
     Uses params to find the i coefficient, creates a VTK, calls the CFD solver, and computes the cost.
@@ -177,6 +177,7 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
         initial_N: Initial number of points in the meshing, in the y=-1 row.
         timestep: Timestep of the trajectory simulation, in seconds.
         filename: Name of the VTK file to save.
+        calc_tj: If True, calculate the trajectory using the given parameters. Otherwise, cost function is lift/drag ratio.
 
     Returns:
         cost: The computed cost of the trajectory. This is the negative of the distance travelled.
@@ -211,6 +212,9 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
     lift, drag = run_cfdA(filename)
     if lift == np.inf or drag == np.inf:
         return PENALTY
+    
+    if not calc_tj:
+        return lift / drag
 
     # calculate reference area (area between y = -qx^2 -s|x| and y = -1)
     _, x_max = find_x_bounds(q, s)
@@ -258,13 +262,15 @@ def cost_fcn_partial(x):
     timestep = 1
     # filename to save the VTK file to
     filename = "../generated_waverider.vtk"
+    # do we want to calculate the trajectory as part of the cost
+    calc_tj = False
 
     if len(x) != 7:
         print(f"Expected 7 parameters, got {len(x)}")
         return PENALTY
 
     print(f"Running cost function with parameters: {x}")
-    mmm = cost_fcn([x[0], x[1], f, x[2], x[3], x[4], x[5], x[6]], dy, initial_N, timestep, filename)
+    mmm = cost_fcn([x[0], x[1], f, x[2], x[3], x[4], x[5], x[6]], dy, initial_N, timestep, filename, calc_tj)
 
     return mmm
 
