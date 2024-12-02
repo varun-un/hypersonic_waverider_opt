@@ -131,7 +131,11 @@ def run_cfd(vtk_filename, drag_loc = -5, lift_loc = -4):
             if not lines:
                 print("Error: integrated_loads.dat is empty.")
                 return np.inf, np.inf
-            last_line = lines[-1].strip()
+            index = -1
+            # check for empty lines at the end of the file
+            if not lines[index].strip():
+                index -= 1
+            last_line = lines[index].strip()
             tokens = last_line.split()
             
             if len(tokens) < 5:
