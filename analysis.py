@@ -12,12 +12,16 @@ Usage:
 import os
 import argparse
 import joblib
+import dill
+import future
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
-from skopt.plots import plot_convergence, plot_evaluations, plot_objective, plot_regret
-from skopt.space import Space
+from skopt.plots import plot_convergence, plot_evaluations, plot_objective, plot_regret, plot_gaussian_process
+from skopt.space import Space, Real
+from skopt import gp_minimize
+from scipy.optimize import OptimizeResult    
 
 from main import cost_fcn_partial, cost_fcn
 
@@ -75,7 +79,7 @@ def extract_metrics(checkpoint_data, penalty_threshold=1e5):
         space = checkpoint_data.get('space', None)
         models = checkpoint_data.get('models', [])
 
-        if not x_iters or not func_vals:
+        if x_iters is None or func_vals is None:
             print("No iterations or function values found in checkpoint.")
             return metrics
 
@@ -279,36 +283,42 @@ def plot_evaluations_custom(metrics, space, output_path=None):
     except Exception as e:
         print(f"Error plotting evaluations: {e}")
 
-def plot_uncertainty(metrics, output_path=None):
+def plot_uncertainty(metrics, res, output_path=None):
     """
     Plot the uncertainty from the Gaussian Process surrogate model.
 
     Parameters:
         metrics (dict): Extracted metrics containing 'latest_model'.
+        res (dict): The final result dictionary containing the surrogate model.
         output_path (str): Path to save the plot. If None, display the plot.
     """
     try:
-        latest_model = metrics.get('latest_model', None)
-        if latest_model is None:
+        optimizer = metrics.get('latest_model', None)
+        if optimizer is None:
             print("No GP model available for uncertainty plot.")
+            return
+
+        # Ensure that the latest_model is an skopt.Optimizer
+        if not hasattr(res, "space"):
+            print("The provided model is not an skopt.Optimizer.")
             return
 
         # Define a grid over the search space for plotting
         # Here, we handle 2D parameter space for visualization purposes
-        if len(latest_model.space.dimensions) < 2:
+        if len(res.space.dimensions) < 2:
             print("Not enough dimensions to plot uncertainty.")
             return
 
-        x0_min, x0_max = latest_model.space.dimensions[0].bounds
-        x1_min, x1_max = latest_model.space.dimensions[1].bounds
+        x0_min, x0_max = res.space.dimensions[0].bounds
+        x1_min, x1_max = res.space.dimensions[1].bounds
 
         x0 = np.linspace(x0_min, x0_max, 100)
         x1 = np.linspace(x1_min, x1_max, 100)
         X0, X1 = np.meshgrid(x0, x1)
         X = np.column_stack([X0.ravel(), X1.ravel()])
 
-        # Predict mean and standard deviation
-        y_mean, y_std = latest_model.predict(X, return_std=True)
+        # Predict mean and standard deviation using the surrogate model
+        y_mean, y_std = res.models[-1].predict(X, return_std=True)
 
         Y_mean = y_mean.reshape(X0.shape)
         Y_std = y_std.reshape(X0.shape)
@@ -320,8 +330,8 @@ def plot_uncertainty(metrics, output_path=None):
         contour_mean = plt.contourf(X0, X1, Y_mean, levels=20, cmap='viridis')
         plt.colorbar(contour_mean, label='Predicted Mean')
         plt.title('GP Predicted Mean')
-        plt.xlabel(latest_model.space.dimensions[0].name)
-        plt.ylabel(latest_model.space.dimensions[1].name)
+        plt.xlabel(res.space.dimensions[0].name or "X0")
+        plt.ylabel(res.space.dimensions[1].name or "X1")
         plt.grid(True)
 
         # Plot standard deviation
@@ -329,8 +339,8 @@ def plot_uncertainty(metrics, output_path=None):
         contour_std = plt.contourf(X0, X1, Y_std, levels=20, cmap='viridis')
         plt.colorbar(contour_std, label='Predicted Std Dev')
         plt.title('GP Predicted Uncertainty')
-        plt.xlabel(latest_model.space.dimensions[0].name)
-        plt.ylabel(latest_model.space.dimensions[1].name)
+        plt.xlabel(optimizer.res.dimensions[0].name or "X0")
+        plt.ylabel(optimizer.res.dimensions[1].name or "X1")
         plt.grid(True)
 
         plt.tight_layout()
@@ -395,6 +405,11 @@ def main():
             print("No search space information found in checkpoint.")
             continue
 
+        # open the final_result.pkl file
+        final_result_pth = os.path.join(checkpoint_dir, 'final_result.pkl')
+        with open(final_result_pth, 'rb') as f:
+            final_result = dill.load(f)
+
         # Generate and save plots
         if output_dir:
             plot_convergence_custom(metrics, output_path=output_dir)
@@ -403,7 +418,7 @@ def main():
             plot_improvement(metrics, output_path=output_dir)
             plot_regret(metrics, output_path=output_dir)
             plot_evaluations_custom(metrics, space, output_path=output_dir)
-            plot_uncertainty(metrics, output_path=output_dir)
+            plot_uncertainty(metrics, final_result, output_path=output_dir)
         else:
             plot_convergence_custom(metrics)
             plot_function_values(metrics)
@@ -423,6 +438,7 @@ def main():
             })
             metrics_df.to_csv(os.path.join(output_dir, 'bo_metrics.csv'), index=False)
             print(f"Metrics saved to {output_dir}/bo_metrics.csv")
+
 
 if __name__ == "__main__":
     main()

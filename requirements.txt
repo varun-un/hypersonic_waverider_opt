@@ -6,3 +6,4 @@ scikit-optimize
 seaborn
 pandas
 joblib
+future

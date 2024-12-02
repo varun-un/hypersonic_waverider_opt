@@ -247,6 +247,8 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
 
 def cost_fcn_partial(x):
 
+    f = 0
+
     # spacing in the y direction for meshing
     dy = 0.01
     # max number of mesh vertices in the y=-1 row
@@ -256,7 +258,10 @@ def cost_fcn_partial(x):
     # filename to save the VTK file to
     filename = "../generated_waverider.vtk"
 
-    
+    if len(x) != 7:
+        print(f"Expected 7 parameters, got {len(x)}")
+        return PENALTY
+
     print(f"Running cost function with parameters: {x}")
     mmm = cost_fcn([x[0], x[1], f, x[2], x[3], x[4], x[5], x[6]], dy, initial_N, timestep, filename)
 
@@ -304,10 +309,14 @@ if __name__ == "__main__":
         func=cost_fcn_partial,              # Objective function to minimize
         dimensions=space,                   # Search space
         acq_func="EI",                      # Acquisition function
-        n_calls=100,                         # Total number of evaluations
+        n_calls=25,                         # Total number of evaluations
         n_initial_points=5,                 # Initial random evaluations
         random_state=1,                     # Seed for reproducibility
         callback=[checkpoint_saver],        # Save progress
         noise="gaussian",                   # Assume somewhat noisy observations
         verbose=True                        # Print progress
     )
+
+    # Save the final result
+    with open(f"{output_folder}/final_result.pkl", "wb") as file:
+        dill.dump(result, file)
