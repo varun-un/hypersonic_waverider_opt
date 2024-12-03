@@ -231,12 +231,17 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
         return PENALTY
 
     # ------ Run CFD ------
-    lift, drag = run_cfdJ(filename)
+    lift, drag = run_cfdA(filename)
     if lift == np.inf or drag == np.inf:
         return PENALTY
     
     if not calc_tj:
-        return lift / drag
+        ratio = lift / drag
+
+        # inflate ratio to make it more significant
+        ratio *= 1e5
+
+        return -1 * ratio
 
     # calculate reference area (area between y = -qx^2 -s|x| and y = -1)
     _, x_max = find_x_bounds(q, s)
@@ -338,7 +343,7 @@ if __name__ == "__main__":
         func=cost_fcn_partial,              # Objective function to minimize
         dimensions=space,                   # Search space
         acq_func="EI",                      # Acquisition function
-        n_calls=10,                         # Total number of evaluations
+        n_calls=100,                         # Total number of evaluations
         n_initial_points=4,                 # Initial random evaluations
         random_state=1,                     # Seed for reproducibility
         callback=[checkpoint_saver],        # Save progress

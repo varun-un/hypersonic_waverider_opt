@@ -453,15 +453,15 @@ def generate_mesh(a, c, f, g, h, i, j, q, s, dy, initial_N, filename):
 
 def main():
 
-    a = 0
+    a = -0.3
     c = 0.0
     f = 0
-    g = -0.8
-    h = 1.7
-    i = 0.45
-    j = 0.17
-    q = 2.5
-    s = 0.5
+    g = 0.0
+    h = 0.0
+    i = 0.12
+    j = 0.0
+    q = 0
+    s = 3
 
     dy = 0.02
     initial_N = 52      # usually >= 1/dy + 2
@@ -499,7 +499,8 @@ def main():
     import pyvista as pv
 
     mesh = pv.read("output.vtk")
-    mesh.plot_normals(mag=0.1, color='black')
+    # mesh.plot_normals(mag=0.1, color='black')
+    mesh.plot(show_edges=True)
 
 if __name__ == "__main__":
     main()

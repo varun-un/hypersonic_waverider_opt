@@ -285,19 +285,37 @@ def single_shot():
     initial_mach = 10.0      # Mach number
     geometry_length = 1.0  # meters
     S = .3  # Reference Area (m^2)
+    back_area = 0.1  # m^2
     timestep = 3          # seconds
+
+    # using first case Duncan ran
+    lift = 794.6*2
+    drag = 90.3*2
+    print(f"Using Lift: {lift:.3f}, Drag: {drag:.3f}")
+
+    atm = get_atm(30000)
+    density = atm['density']
+    a = math.sqrt(GAMMA * R * atm['temperature'])
+    speed = 7 * a
+
+    # convert to cl and cd
+    cl = lift / (0.5 * density * speed**2 * S)
+    cd = drag / (0.5 * density * speed**2 * S)
+
+    print(f"Using Cl: {cl:.3f}, Cd: {cd:.3f}")
+    print(f"Simulating trajectory starting from {initial_altitude} meters with Mach {initial_mach} and reference area {back_area} meters.")
     
     distance_traveled = simulate_trajectory(
         mass=mass,
         initial_altitude=initial_altitude,
         initial_mach=initial_mach,
         geometry_length=geometry_length,
-        S=S,
+        S=back_area,
         timestep=timestep,
         verbose=True,
-        back_area=0.01,
-        cl=0.5,
-        cd=0.3
+        back_area=back_area,
+        cl=cl,
+        cd=cd
     )
     
     print(f"Total horizontal distance traveled: {distance_traveled:.3f} meters")

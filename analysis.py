@@ -179,9 +179,9 @@ def plot_function_values(metrics, output_path=None):
     except Exception as e:
         print(f"Error plotting function values: {e}")
 
-def plot_histogram(metrics, output_path=None):
+def plot_kdeplot(metrics, output_path=None):
     """
-    Plot a histogram of function evaluations.
+    Plot a kdeplot of function evaluations.
 
     Parameters:
         metrics (dict): Extracted metrics containing 'func_vals'.
@@ -189,17 +189,17 @@ def plot_histogram(metrics, output_path=None):
     """
     try:
         plt.figure(figsize=(10, 6))
-        sns.histplot(metrics['func_vals'], bins=30, kde=True)
-        plt.title('Histogram of Function Evaluations')
+        sns.kdeplot(metrics['func_vals'], shade=True)
+        plt.title('KDE of Function Evaluations')
         plt.xlabel('Function Value')
         plt.ylabel('Frequency')
         if output_path:
-            plt.savefig(os.path.join(output_path, 'function_values_histogram.png'))
-            print(f"Function values histogram saved to {output_path}/function_values_histogram.png")
+            plt.savefig(os.path.join(output_path, 'function_values_kdeplot.png'))
+            print(f"Function values kdeplot saved to {output_path}/kdeplot.png")
         else:
             plt.show()
     except Exception as e:
-        print(f"Error plotting histogram: {e}")
+        print(f"Error plotting kdeplot: {e}")
 
 def plot_improvement(metrics, output_path=None):
     """
@@ -414,7 +414,7 @@ def main():
         if output_dir:
             plot_convergence_custom(metrics, output_path=output_dir)
             plot_function_values(metrics, output_path=output_dir)
-            plot_histogram(metrics, output_path=output_dir)
+            plot_kdeplot(metrics, output_path=output_dir)
             plot_improvement(metrics, output_path=output_dir)
             plot_regret(metrics, output_path=output_dir)
             plot_evaluations_custom(metrics, space, output_path=output_dir)
@@ -422,11 +422,11 @@ def main():
         else:
             plot_convergence_custom(metrics)
             plot_function_values(metrics)
-            plot_histogram(metrics)
+            plot_kdeplot(metrics)
             plot_improvement(metrics)
             plot_regret(metrics)
             plot_evaluations_custom(metrics, space)
-            plot_uncertainty(metrics)
+            plot_uncertainty(metrics, final_result)
 
         # Optionally, save the metrics to a CSV file
         if output_dir:
