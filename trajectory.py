@@ -1,6 +1,7 @@
 import math
 import pandas as pd
 import numpy as np
+import volume as vol
 from scipy.interpolate import griddata
 from scipy.optimize import minimize
 from ambiance import Atmosphere
@@ -208,7 +209,6 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
     # initial properties
     atm = get_atm(altitude)
     temperature = atm['temperature']
-    rho = atm['density']
     
     # speed of sound
     a = math.sqrt(GAMMA * R * temperature)
@@ -274,7 +274,13 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
             altitude = 0
         
         if verbose:
-            print(f"Time: {time_elapsed:.3f}s, X: {x_position:.3f}m, Altitude: {altitude:.3f}m, Vx: {Vx:.3f}m/s, Vz: {Vz:.3f}m/s, Lift: {F_L:.3f}N, Drag: {F_D:.3f}N")
+            atm = get_atm(min(altitude, MAX_ALT))
+            temperature = atm['temperature']
+            a = math.sqrt(GAMMA * R * temperature)
+            mach = current_speed / a
+            back_pressure = back_area * atm['pressure'] / mach
+            
+            print(f"Time: {time_elapsed:.3f}s, X: {x_position:.3f}m, Altitude: {altitude:.3f}m, Vx: {Vx:.3f}m/s, Vz: {Vz:.3f}m/s, Mach: {mach:.3f}, Lift: {F_L:.3f}N, Net Drag: {F_D:.3f}N, Back Pressure: {back_pressure:.3f}N")
     
     return x_position
 
@@ -284,8 +290,8 @@ def single_shot():
     initial_altitude = 40000.0  # meters (40 km)
     initial_mach = 10.0      # Mach number
     geometry_length = 1.0  # meters
-    S = .3  # Reference Area (m^2)
-    back_area = 0.1  # m^2
+    back_area = vol.back_area(0, 0.12, 0, 0, 3)  # m^2
+    S = back_area  # Reference Area (m^2)
     timestep = 3          # seconds
 
     # using first case Duncan ran
@@ -310,7 +316,7 @@ def single_shot():
         initial_altitude=initial_altitude,
         initial_mach=initial_mach,
         geometry_length=geometry_length,
-        S=back_area,
+        S=S,
         timestep=timestep,
         verbose=True,
         back_area=back_area,
