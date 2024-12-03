@@ -7,3 +7,4 @@ seaborn
 pandas
 joblib
 future
+ambiance

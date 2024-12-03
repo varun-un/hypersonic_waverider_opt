@@ -112,6 +112,9 @@ def run_cfd(vtk_filename, drag_loc = -5, lift_loc = -4):
         subprocess.run(submit_command, cwd=parent_dir, check=True)
         
         print("CFD job submitted. Waiting for completion...")
+
+        # check if the file exists
+        exists = os.path.exists(loads_file)
         
         # Wait for the loads_file to be updated by the CFD job
         while True:
@@ -120,10 +123,14 @@ def run_cfd(vtk_filename, drag_loc = -5, lift_loc = -4):
             if elapsed_time >= max_wait_time:
                 print("Timeout waiting for CFD job to complete.")
                 return np.inf, np.inf
-            current_mtime = os.path.getmtime(loads_file)
-            if current_mtime > initial_mtime:
-                print("CFD job completed.")
-                break
+            if exists:
+                current_mtime = os.path.getmtime(loads_file)
+                if current_mtime > initial_mtime:
+                    print("CFD job completed.")
+                    break
+            else:
+                # Check if the file exists now
+                exists = os.path.exists(loads_file)
 
         # Read the last line of the integrated_loads.dat file
         with open(loads_file, "r") as file:
