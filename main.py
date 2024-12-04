@@ -16,6 +16,7 @@ import os
 import subprocess
 import time
 import dill
+import math
 
 MASS = 25
 INITIAL_ALT = 40000.0  # meters (40 km)
@@ -236,6 +237,15 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
         return PENALTY
     
     if not calc_tj:
+
+        back_area = back_area(h, i, j, q, s)
+
+        atm_dict = tj.get_atm(30000)
+
+        back_pressure = back_area * atm_dict['pressure'] / 7
+
+        drag -= back_pressure
+
         ratio = lift / drag
 
         # inflate ratio to make it more significant
@@ -343,8 +353,8 @@ if __name__ == "__main__":
         func=cost_fcn_partial,              # Objective function to minimize
         dimensions=space,                   # Search space
         acq_func="EI",                      # Acquisition function
-        n_calls=100,                         # Total number of evaluations
-        n_initial_points=4,                 # Initial random evaluations
+        n_calls=1000,                         # Total number of evaluations
+        n_initial_points=10,                 # Initial random evaluations
         random_state=1,                     # Seed for reproducibility
         callback=[checkpoint_saver],        # Save progress
         noise="gaussian",                   # Assume somewhat noisy observations

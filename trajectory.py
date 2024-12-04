@@ -155,7 +155,7 @@ def get_lift_drag(speed, altitude, geometry_length, S, back_area, **kwargs):
 
     # add back pressure
     a = math.sqrt(GAMMA * R * atm['temperature'])
-    # F_D += back_area * atm['pressure'] / (speed / a)
+    F_D -= back_area * atm['pressure'] / (speed / a)
     
     return F_L, F_D
 
@@ -181,6 +181,12 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         float: Total horizontal distance traveled in meters.
                 Accurate to resolution of the timestep.
     """
+    alt = []
+    x_dist = []
+    lift_arr = []
+    drag_arr = []
+    bp_arr = []
+    t_arr = []
     
     altitude = initial_altitude  # z position in meters
     x_position = 0.0             # x position in meters
@@ -257,6 +263,13 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         # Prevent negative altitude
         if altitude < 0:
             altitude = 0
+
+        # Append data for plotting
+        alt.append(altitude)
+        x_dist.append(x_position)
+        lift_arr.append(F_L)
+        drag_arr.append(F_D)
+        bp_arr.append(back_area * atm['pressure'] / (current_speed / a))
         
         if verbose:
             atm = get_atm(min(altitude, MAX_ALT))
