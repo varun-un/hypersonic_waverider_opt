@@ -463,8 +463,8 @@ def main():
     q = 0
     s = 3
 
-    dy = 0.02
-    initial_N = 52      # usually >= 1/dy + 2
+    dy = 0.1
+    initial_N = 12      # usually >= 1/dy + 2
     y_min = -1.0
     y_max = 0.0
     
