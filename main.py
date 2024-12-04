@@ -94,7 +94,7 @@ def run_cfd(vtk_filename, drag_loc = -5, lift_loc = -4):
         loads_file = os.path.join(parent_dir, "sim", "surf", "integrated_loads.dat")
         
         # Ensure the loads_file exists; if not, wait for it to be created
-        max_wait_time = 900  # Maximum wait time in seconds (15 minutes)
+        max_wait_time = 300  # Maximum wait time in seconds (5 minutes)
         wait_interval = 5    # Interval between checks in seconds
         elapsed_time = 0
 
