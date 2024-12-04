@@ -173,7 +173,7 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         back_area (float): Area of the back surface in m^2.
         timestep (float): Time step resolution in seconds.
         verbose (bool): Print simulation details.
-        angle_of_attack_func (function): Function that takes time (s) and returns AoA in degrees.
+        angle_of_attack_func (function): Function that takes x_distance (m) and returns AoA in degrees.
         **kwargs: Additional keyword arguments to pass to get_lift_drag.
                   Can specify Cl and Cd directly. Use `cl` and `cd` to pass the values.
     
@@ -218,7 +218,7 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         
         # Determine Angle of Attack
         if angle_of_attack_func is not None:
-            AoA_deg = angle_of_attack_func(time_elapsed)
+            AoA_deg = angle_of_attack_func(x_dist)
             AoA_rad = math.radians(AoA_deg)
         else:
             AoA_deg = 0

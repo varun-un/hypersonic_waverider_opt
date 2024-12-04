@@ -98,24 +98,25 @@ def run_cfd(vtk_filename, drag_loc = -5, lift_loc = -4):
         wait_interval = 5    # Interval between checks in seconds
         elapsed_time = 0
 
-        while not os.path.exists(loads_file):
-            if elapsed_time >= max_wait_time:
-                print(f"Timeout: {loads_file} does not exist.")
-                return np.inf, np.inf
-            time.sleep(wait_interval)
-            elapsed_time += wait_interval
+        # check if the file exists
+        exists = os.path.exists(loads_file)
+
+        print("Integrated loads file exists? ", exists)
 
         # Record the initial modification time of the loads_file
-        initial_mtime = os.path.getmtime(loads_file)
+        if exists:
+            initial_mtime = os.path.getmtime(loads_file)
+        else:
+            initial_mtime = -1
+
         
         # Submit the CFD job using sbatch
         submit_command = ["./champs+", "input.sdf"]
+        print("Gonna try to run: ", str(parent_dir), str(submit_command))
         subprocess.run(submit_command, cwd=parent_dir, check=True)
         
         print("CFD job submitted. Waiting for completion...")
 
-        # check if the file exists
-        exists = os.path.exists(loads_file)
         
         # Wait for the loads_file to be updated by the CFD job
         while True:
@@ -125,6 +126,7 @@ def run_cfd(vtk_filename, drag_loc = -5, lift_loc = -4):
                 print("Timeout waiting for CFD job to complete.")
                 return np.inf, np.inf
             if exists:
+                # Check if the file has been modified
                 current_mtime = os.path.getmtime(loads_file)
                 if current_mtime > initial_mtime:
                     print("CFD job completed.")
