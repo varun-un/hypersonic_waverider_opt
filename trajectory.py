@@ -265,13 +265,14 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
             altitude = 0
 
         # Append data for plotting
-        alt.append(altitude)
-        x_dist.append(x_position)
-        lift_arr.append(F_L)
-        drag_arr.append(F_D)
-        bp_arr.append(back_area * atm['pressure'] / (current_speed / a))
-        
         if verbose:
+            alt.append(altitude)
+            x_dist.append(x_position)
+            lift_arr.append(F_L)
+            drag_arr.append(F_D)
+            bp_arr.append(back_area * atm['pressure'] / (current_speed / a))
+            t_arr.append(time_elapsed)
+
             atm = get_atm(min(altitude, MAX_ALT))
             temperature = atm['temperature']
             a_speed = math.sqrt(GAMMA * R * temperature)
@@ -280,6 +281,32 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
             
             print(f"Time: {time_elapsed:.3f}s, X: {x_position:.3f}m, Altitude: {altitude:.3f}m, Vx: {Vx:.3f}m/s, Vz: {Vz:.3f}m/s, Mach: {mach:.3f}, AoA: {AoA_deg:.2f}, Lift: {F_L:.3f}N, Drag: {F_D:.3f}N, Back Pressure: {back_pressure:.3f}N")
     
+
+    if verbose:
+        # Plotting
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(12, 6))
+        plt.plot(x_dist, alt, label='Altitude')
+        plt.legend()
+        plt.xlabel('Distance (m)')
+        plt.ylabel('Altitude (m)')
+        plt.title('Altitude vs Distance')
+        plt.grid(True)
+        plt.show()
+
+        # plot lift, drag, back pressure vs time
+        plt.figure(figsize=(12, 6))
+        plt.plot(t_arr, lift_arr, label='Lift')
+        plt.plot(t_arr, drag_arr, label='Drag')
+        plt.plot(t_arr, bp_arr, label='Back Pressure')
+        plt.legend()
+        plt.xlabel('Time (s)')
+        plt.ylabel('Force (N)')
+        plt.title('Lift, Drag, Back Pressure vs Time')
+        plt.grid(True)
+        plt.show()
+        
+
     return x_position
 
 def single_shot():

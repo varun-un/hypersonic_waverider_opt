@@ -238,11 +238,11 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
     
     if not calc_tj:
 
-        back_area = back_area(h, i, j, q, s)
+        back_areaD = back_area(h, i, j, q, s)
 
         atm_dict = tj.get_atm(30000)
 
-        back_pressure = back_area * atm_dict['pressure'] / 7
+        back_pressure = back_areaD * atm_dict['pressure'] / 7
 
         drag -= back_pressure
 
