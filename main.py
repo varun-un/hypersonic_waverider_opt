@@ -232,7 +232,7 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
         return PENALTY
 
     # ------ Run CFD ------
-    lift, drag = run_cfdA(filename)
+    lift, drag = run_cfdJ(filename)
     if lift == np.inf or drag == np.inf:
         return PENALTY
     
@@ -353,8 +353,8 @@ if __name__ == "__main__":
         func=cost_fcn_partial,              # Objective function to minimize
         dimensions=space,                   # Search space
         acq_func="EI",                      # Acquisition function
-        n_calls=1000,                         # Total number of evaluations
-        n_initial_points=10,                 # Initial random evaluations
+        n_calls=50,                         # Total number of evaluations
+        n_initial_points=5,                 # Initial random evaluations
         random_state=1,                     # Seed for reproducibility
         callback=[checkpoint_saver],        # Save progress
         noise="gaussian",                   # Assume somewhat noisy observations
