@@ -234,7 +234,7 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
         return PENALTY
 
     # ------ Run CFD ------
-    lift, drag = run_cfdJ(filename)
+    lift, drag = run_cfdA(filename)
     if lift == np.inf or drag == np.inf:
         return PENALTY
     
@@ -328,13 +328,13 @@ if __name__ == "__main__":
 
     # Define the parameter space    (exclude f and i)
     space = [
-        Real(-10.0, 10.0, name='a'),
-        Real(-10.0, 10.0, name='c'),
-        Real(-5.0, 5.0, name='g'),
-        Real(0.0, 15.0, name='h'),
-        Real(0.0, 2.0, name='j'),
-        Real(0.0, 10.0, name='q'),
-        Real(0.0, 10.0, name='s')
+        Real(-1.0, 1.0, name='a'),
+        Real(-1.0, 1.0, name='c'),
+        Real(-1.0, 1.0, name='g'),
+        Real(0.0, 2.0, name='h'),
+        Real(0.0, 1.0, name='j'),
+        Real(0.0, 2.0, name='q'),
+        Real(1.0, 4.0, name='s')
     ]
 
     # check above for meshing parameters
@@ -355,7 +355,7 @@ if __name__ == "__main__":
         func=cost_fcn_partial,              # Objective function to minimize
         dimensions=space,                   # Search space
         acq_func="EI",                      # Acquisition function
-        n_calls=250,                         # Total number of evaluations
+        n_calls=20,                         # Total number of evaluations
         n_initial_points=5,                 # Initial random evaluations
         random_state=1,                     # Seed for reproducibility
         callback=[checkpoint_saver],        # Save progress
@@ -366,3 +366,6 @@ if __name__ == "__main__":
     # Save the final result
     with open(f"{output_folder}/final_result.pkl", "wb") as file:
         dill.dump(result, file)
+
+
+    print(result)

@@ -239,3 +239,17 @@ def interpolate_lift_drag(df, mach, aoa):
         drag_interp = griddata(points, drag_values, (mach_clipped, aoa_clipped), method='nearest')
 
     return lift_interp, drag_interp
+
+def AoA_param(a, b, c, d, n, k):
+    """
+    Creates a function that returns the angle of attack (in degrees) as a function of x.
+
+    a, b, c, d, n, k: Coefficients defining the angle of attack function. It's a damping sine wave.
+    """
+    def aoa(x):
+        return a / (x - c)**n * np.cos(b * (x - c)) + k * (x - c) + d
+    
+    return aoa
+
+def tj_cost_fcn(params):
+    pass
