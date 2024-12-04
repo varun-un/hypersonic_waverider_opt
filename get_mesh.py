@@ -22,7 +22,7 @@ def extract_parameters(log_file_path, iteration_number):
     iteration_start_pattern = re.compile(rf"Iteration No:\s*{iteration_number}\s*started\.")
 
     try:
-        with open(log_file_path, 'r', encoding='utf-16-be') as file:
+        with open(log_file_path, 'r', encoding='utf-8') as file:
             for line in file:
                 # Check if the current line marks the start of the desired iteration
                 if iteration_start_pattern.search(line):
