@@ -155,14 +155,14 @@ def get_lift_drag(speed, altitude, geometry_length, S, back_area, **kwargs):
 
     # add back pressure
     a = math.sqrt(GAMMA * R * atm['temperature'])
-    F_D += back_area * atm['pressure'] / (speed / a)
+    # F_D += back_area * atm['pressure'] / (speed / a)
     
     return F_L, F_D
 
 # Trajectory Simulation
-def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S, back_area, timestep=.01, verbose = False, **kwargs):
+def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S, back_area, timestep=0.01, verbose=False, angle_of_attack_func=None, **kwargs):
     """
-    Simulate the trajectory of the waverider until it reaches the ground.
+    Simulate the trajectory of the waverider with variable Angle of Attack (AoA) until it reaches the ground.
     
     Parameters:
         mass (float): Mass of the waverider in kg.
@@ -173,8 +173,9 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         back_area (float): Area of the back surface in m^2.
         timestep (float): Time step resolution in seconds.
         verbose (bool): Print simulation details.
+        angle_of_attack_func (function): Function that takes time (s) and returns AoA in degrees.
         **kwargs: Additional keyword arguments to pass to get_lift_drag.
-                    Can specify Cl and Cd directly. Use `cl` and `cd` to pass the values.
+                  Can specify Cl and Cd directly. Use `cl` and `cd` to pass the values.
     
     Returns:
         float: Total horizontal distance traveled in meters.
@@ -184,81 +185,87 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
     altitude = initial_altitude  # z position in meters
     x_position = 0.0             # x position in meters
     
-    # initial properties
-    atm = get_atm(altitude)
+    # Initial atmospheric properties
+    atm = get_atm(initial_altitude)
     temperature = atm['temperature']
     
-    # speed of sound
+    # Speed of sound
     a = math.sqrt(GAMMA * R * temperature)
     speed = initial_mach * a  # m/s
 
-    Vx = speed  
-    Vz = 0.0  
+    # Initial velocity components
+    Vx = speed * math.cos(0.0)  # Assuming initial AoA is 0
+    Vz = speed * math.sin(0.0)
     
     time_elapsed = 0.0  
     
     while altitude > 0:
-
-        # max out at circumference of earth
-        if x_position > 20075000:
-            print("Reached the half the circumference of the Earth. Exiting simulation.")
+        # Prevent glider from orbiting indefinitely
+        if x_position > 20075000:  # Half the Earth's circumference
+            print("Reached half the circumference of the Earth. Exiting simulation.")
             break
 
-        current_speed = math.sqrt(Vx**2 + Vz**2)        # normalizing factor
+        current_speed = math.sqrt(Vx**2 + Vz**2)  # Relative speed
         
         # Get lift and drag forces
         F_L, F_D = get_lift_drag(current_speed, min(altitude, MAX_ALT), geometry_length, S, back_area, **kwargs)
         
-        # use vector dynamics to decompose and calculate forces
-        # in order to maintain 0 AoA as it falls, it will pitch to maintain 0 AoA, where it 
-        # faces the fresstream velocity vector, and lift is perpendicular to this
-        # in the global frame, use the velocity vector to decompose the forces
-        if current_speed != 0:
-            F_Dx = -F_D * (Vx / current_speed)
-            F_Dz = -F_D * (Vz / current_speed)
+        # Determine Angle of Attack
+        if angle_of_attack_func is not None:
+            AoA_deg = angle_of_attack_func(time_elapsed)
+            AoA_rad = math.radians(AoA_deg)
         else:
-            F_Dx = 0.0
-            F_Dz = 0.0
+            AoA_deg = 0
+            AoA_rad = 0.0  # Default to 0 if no function is provided
 
-        if current_speed != 0:
-            F_Lx = F_L * (-Vz / current_speed)
-            F_Lz = F_L * (Vx / current_speed)
-        else:
-            F_Lx = 0.0
-            F_Lz = F_L  # All lift acts vertically if there's no horizontal speed
+        theta = math.atan2(-Vz, Vx)
+
+        phi = theta - AoA_rad
         
-        # grav
-        F_g = -mass * G  # Negative since it acts downward
+        # Decompose Drag Force
+        F_Dx = -F_D * math.cos(phi)
+        F_Dz = F_D * math.sin(phi)
         
-        # Net forces
+        # Decompose Lift Force based on AoA
+        F_Lx = F_L * math.sin(phi)
+        F_Lz = F_L * math.cos(phi)
+        
+        # Gravity Force
+        F_g = -mass * G  # Downward
+        
+        # Net Forces
         F_net_x = F_Dx + F_Lx
         F_net_z = F_Dz + F_Lz + F_g
+
+        # print(F_net_x, F_net_z)
         
         # Accelerations
         a_x = F_net_x / mass
         a_z = F_net_z / mass
         
-        # Update velocities - by doing numerical integration we doing a simple euler method for dt
+        # Update velocities
         Vx += a_x * timestep
         Vz += a_z * timestep
         
         # Update positions
         x_position += Vx * timestep
         altitude += Vz * timestep
-
+        
+        # Update time
         time_elapsed += timestep
         
+        # Prevent negative altitude
         if altitude < 0:
             altitude = 0
         
         if verbose:
             atm = get_atm(min(altitude, MAX_ALT))
             temperature = atm['temperature']
-            a = math.sqrt(GAMMA * R * temperature)
-            mach = current_speed / a
+            a_speed = math.sqrt(GAMMA * R * temperature)
+            mach = current_speed / a_speed
             back_pressure = back_area * atm['pressure'] / mach
-
-            print(f"Time: {time_elapsed:.3f}s, X: {x_position:.3f}m, Altitude: {altitude:.3f}m, Vx: {Vx:.3f}m/s, Vz: {Vz:.3f}m/s, Mach: {mach:.3f}, Lift: {F_L:.3f}N, Net Drag: {F_D:.3f}N, Back Pressure: {back_pressure:.3f}N")
+            
+            print(f"Time: {time_elapsed:.3f}s, X: {x_position:.3f}m, Altitude: {altitude:.3f}m, Vx: {Vx:.3f}m/s, Vz: {Vz:.3f}m/s, Mach: {mach:.3f}, AoA: {AoA_deg:.2f}, Lift: {F_L:.3f}N, Drag: {F_D:.3f}N, Back Pressure: {back_pressure:.3f}N")
     
     return x_position
 

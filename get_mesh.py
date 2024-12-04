@@ -86,3 +86,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    # python get_mesh.py trace.log 6
