@@ -111,7 +111,7 @@ def run_cfd(vtk_filename, drag_loc = -5, lift_loc = -4):
 
         
         # Submit the CFD job using sbatch
-        submit_command = ["./champs+", "input.sdf", " >/dev/null"]
+        submit_command = ["./champs+", "input.sdf", " > /dev/null"]
         print("Gonna try to run: ", str(parent_dir), str(submit_command))
         subprocess.run(submit_command, cwd=parent_dir, check=True)
         
@@ -234,7 +234,7 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
         return PENALTY
 
     # ------ Run CFD ------
-    lift, drag = run_cfdA(filename)
+    lift, drag = run_cfdJ(filename)
     if lift == np.inf or drag == np.inf:
         return PENALTY
     
@@ -355,7 +355,7 @@ if __name__ == "__main__":
         func=cost_fcn_partial,              # Objective function to minimize
         dimensions=space,                   # Search space
         acq_func="EI",                      # Acquisition function
-        n_calls=20,                         # Total number of evaluations
+        n_calls=50,                         # Total number of evaluations
         n_initial_points=5,                 # Initial random evaluations
         random_state=1,                     # Seed for reproducibility
         callback=[checkpoint_saver],        # Save progress
