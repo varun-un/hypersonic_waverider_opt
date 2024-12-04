@@ -148,7 +148,7 @@ def run_cfd(vtk_filename, drag_loc = -5, lift_loc = -4):
             last_line = lines[index].strip()
             tokens = last_line.split()
             
-            if len(tokens) < 5:
+            if len(tokens) < max(-1 * drag_loc, -1 * lift_loc):
                 print("Error: Not enough data in the last line of integrated_loads.dat.")
                 return np.inf, np.inf
             
