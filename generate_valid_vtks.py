@@ -106,6 +106,12 @@ def generate_vtks_for_valid_iterations(log_file_path, output_dir):
     else:
         print(f"Output directory already exists: {output_dir}")
 
+    # save function values to an array
+    eval_values = [it['function_value'] for it in valid_iterations]
+
+    # get index of minimum value
+    min_idx = eval_values.index(min(eval_values))
+
     # Process each valid iteration
     for idx, it in enumerate(valid_iterations):
         iteration_num = it['iteration']
@@ -156,6 +162,22 @@ def generate_vtks_for_valid_iterations(log_file_path, output_dir):
         except Exception as e:
             print(f"Error reading or plotting mesh for iteration {iteration_num}: {e}")
         """
+
+    # create the min index file again
+    try:
+        iteration_num = valid_iterations[min_idx]['iteration']
+        parameters = valid_iterations[min_idx]['parameters']
+        a, c, g, h, j, q, s = parameters
+        f = 0
+        i = get_i([a, c, f, g, h, j, q, s])
+        dy = 0.01
+        initial_N = 102
+        filename = f"{len(valid_iterations)}.vtk"
+        filepath = os.path.join(output_dir, filename)
+        generate_mesh(a, c, f, g, h, i, j, q, s, dy, initial_N, filepath)
+        print(f"Generated best mesh for iteration {iteration_num}: {filepath}")
+    except Exception as e:
+        print(f"Error generating best mesh for iteration {iteration_num}: {e}")
 
     print("VTK generation completed.")
 
