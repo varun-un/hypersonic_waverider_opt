@@ -31,24 +31,6 @@ def get_atm(altitude):
         'dynamic_viscosity': atm.kinematic_viscosity.item() * atm.density.item()  # mu = ν * ρ
     }
 
-def calculate_cl_cd(speed, altitude):
-    """
-    Calculate lift and drag coefficients using CFD or another method.
-    
-    Parameters:
-        speed (float): Speed in m/s.
-        altitude (float): Altitude in meters.
-    
-    Returns:
-        tuple: C_L, C_D
-    """
-
-    # Replace with actual CFD-based calculations or analytic
-    C_L = 0.5   
-    C_D = 0.3  
-
-    return C_L, C_D
-
 # Method 1: Using lift_drag.csv (Cl, Cd, Mach, Re)
 def get_cl_cd_MRe(speed, altitude, geometry_length, get_atm):
     """
@@ -157,10 +139,6 @@ def get_lift_drag(speed, altitude, geometry_length, S, back_area, **kwargs):
         C_D = kwargs['cd']
     else:
         # Get Cl and Cd
-        # pick method to use
-
-        # C_L, C_D = calculate_cl_cd(speed, altitude, geometry_length, get_atm)
-        # C_L, C_D = get_cl_cd_SAlt(speed, altitude)
         C_L, C_D = get_cl_cd_MRe(speed, altitude, geometry_length, get_atm)
 
     
@@ -177,7 +155,7 @@ def get_lift_drag(speed, altitude, geometry_length, S, back_area, **kwargs):
 
     # add back pressure
     a = math.sqrt(GAMMA * R * atm['temperature'])
-    F_D -= back_area * atm['pressure'] / (speed / a)
+    F_D += back_area * atm['pressure'] / (speed / a)
     
     return F_L, F_D
 
@@ -222,8 +200,8 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
     while altitude > 0:
 
         # max out at circumference of earth
-        if x_position > 40075000:
-            print("Reached the circumference of the Earth. Exiting simulation.")
+        if x_position > 20075000:
+            print("Reached the half the circumference of the Earth. Exiting simulation.")
             break
 
         current_speed = math.sqrt(Vx**2 + Vz**2)        # normalizing factor
@@ -279,7 +257,7 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
             a = math.sqrt(GAMMA * R * temperature)
             mach = current_speed / a
             back_pressure = back_area * atm['pressure'] / mach
-            
+
             print(f"Time: {time_elapsed:.3f}s, X: {x_position:.3f}m, Altitude: {altitude:.3f}m, Vx: {Vx:.3f}m/s, Vz: {Vz:.3f}m/s, Mach: {mach:.3f}, Lift: {F_L:.3f}N, Net Drag: {F_D:.3f}N, Back Pressure: {back_pressure:.3f}N")
     
     return x_position
@@ -292,7 +270,7 @@ def single_shot():
     geometry_length = 1.0  # meters
     back_area = vol.back_area(0, 0.12, 0, 0, 3)  # m^2
     S = back_area  # Reference Area (m^2)
-    timestep = 3          # seconds
+    timestep = 1          # seconds
 
     # using first case Duncan ran
     lift = 794.6*2
@@ -326,47 +304,7 @@ def single_shot():
     
     print(f"Total horizontal distance traveled: {distance_traveled:.3f} meters")
 
-# # https://docs.scipy.org/doc/scipy/reference/optimize.minimize-neldermead.html
-def optimize_geometry(current_params, params_domain, cost_function):
-    """
-    Performs nelder mead optimization, searching the n-dimensional parameterized geometry space for the minimum cost function. 
-    
-    Parameters:
-        current_params (list): Initial guess for the parameters. Should match the length of params_domain. Vector to optimize.
-        params_domain (list): Domain of the parameters. Each element is a tuple (min, max), or None for unconstrained.
-        cost_function (function): Function to minimize.
-    
-    Returns:
-        list: Optimized parameters, which is a vector of the same length as current_params.
-    """
-    # Minimize the cost function
-    result = minimize(
-        cost_function,
-        current_params,
-        bounds=params_domain,
-        method='Nelder-Mead',
-        options={
-            'disp': True,
-            'maxiter': 1000
-        }
-    )
-    
-    return result.x
     
 
 if __name__ == "__main__":
     single_shot()
-
-    # this depends on how we parameterize the geometry
-    # optimize_geometry(
-    #     current_params=[1.0],
-    #     params_domain=[(0.1, 10.0)],
-    #     cost_function=lambda x: -1 * simulate_trajectory(
-    #         mass=25,
-    #         initial_altitude=40000.0,
-    #         initial_mach=10.0,
-    #         geometry_length=x[0],
-    #         S=0.3,
-    #         timestep=1
-    #     )
-    # )
