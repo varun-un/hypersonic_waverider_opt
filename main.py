@@ -355,8 +355,8 @@ if __name__ == "__main__":
         func=cost_fcn_partial,              # Objective function to minimize
         dimensions=space,                   # Search space
         acq_func="EI",                      # Acquisition function
-        n_calls=50,                         # Total number of evaluations
-        n_initial_points=5,                 # Initial random evaluations
+        n_calls=2,                         # Total number of evaluations
+        n_initial_points=1,                 # Initial random evaluations
         random_state=1,                     # Seed for reproducibility
         callback=[checkpoint_saver],        # Save progress
         noise="gaussian",                   # Assume somewhat noisy observations
