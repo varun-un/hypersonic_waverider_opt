@@ -5,9 +5,13 @@ import numpy as np
 import pandas as pd
 import shutil
 import re
+import math
 from itertools import product
 from scipy.interpolate import griddata
+from scipy.optimize import minimize
+
 import trajectory as tj
+import volume as vol
 
 
 def run_cfd(drag_loc=-5, lift_loc=-4):
@@ -253,16 +257,19 @@ def interpolate_lift_drag(df, mach, aoa):
 def AoA_param(a, b, c, d, n, k):
     """
     Creates a function that returns the angle of attack (in degrees) as a function of x.
+    To avoid saturation with small optimized coefficients, x will be in kilometers.
+    This function will be clamped to -10 and 10 degrees.
 
     a, b, c, d, n, k: Coefficients defining the angle of attack function. It's a damping sine wave.
     """
     def aoa(x):
-        return a / (x - c)**n * np.cos(b * (x - c)) + k * (x - c) + d
+        val = a / (x - c)**n * np.cos(b * (x - c)) + k * (x - c) + d
+        return np.clip(val, -10, 10)
     
     return aoa
 
-# Trajectory Simulation
-def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S, back_area, timestep=0.01, verbose=False, angle_of_attack_func=None, **kwargs):
+# Trajectory Simulation (mostly copied from trajectory.py)
+def simulate_trajectory_final(mass, initial_altitude, initial_mach, df, back_area, timestep=0.01, verbose=False, angle_of_attack_func=None):
     """
     Simulate the trajectory of the waverider with variable Angle of Attack (AoA) until it reaches the ground.
     
@@ -270,14 +277,11 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         mass (float): Mass of the waverider in kg.
         initial_altitude (float): Initial altitude in meters.
         initial_mach (float): Initial Mach number.
-        geometry_length (float): Characteristic length of the geometry in meters.
-        S (float): Reference area in m^2.
+        df (pd.DataFrame): DataFrame with columns ['mach', 'aoa', 'lift', 'drag']. Used for lift and drag interpolation.
         back_area (float): Area of the back surface in m^2.
         timestep (float): Time step resolution in seconds.
         verbose (bool): Print simulation details.
         angle_of_attack_func (function): Function that takes x_distance (m) and returns AoA in degrees.
-        **kwargs: Additional keyword arguments to pass to get_lift_drag.
-                  Can specify Cl and Cd directly. Use `cl` and `cd` to pass the values.
     
     Returns:
         float: Total horizontal distance traveled in meters.
@@ -294,11 +298,11 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
     x_position = 0.0             # x position in meters
     
     # Initial atmospheric properties
-    atm = get_atm(initial_altitude)
+    atm = tj.get_atm(initial_altitude)
     temperature = atm['temperature']
     
     # Speed of sound
-    a = math.sqrt(GAMMA * R * temperature)
+    a = math.sqrt(tj.GAMMA * tj.R * temperature)
     speed = initial_mach * a  # m/s
 
     # Initial velocity components
@@ -314,9 +318,11 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
             break
 
         current_speed = math.sqrt(Vx**2 + Vz**2)  # Relative speed
-        
-        # Get lift and drag forces
-        F_L, F_D = get_lift_drag(current_speed, min(altitude, MAX_ALT), geometry_length, S, back_area, **kwargs)
+
+        atm = tj.get_atm(min(altitude, tj.MAX_ALT))
+        temperature = atm['temperature']
+        a_speed = math.sqrt(tj.GAMMA * tj.R * temperature)
+        mach = current_speed / a_speed
         
         # Determine Angle of Attack
         if angle_of_attack_func is not None:
@@ -329,6 +335,15 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         theta = math.atan2(-Vz, Vx)
 
         phi = theta - AoA_rad
+
+        # Get lift and drag forces
+
+        # if subsonic, let it be in free fall
+        if mach < 1:
+            F_L = 0
+            F_D = 0
+        else:
+            F_L, F_D = interpolate_lift_drag(df, mach, AoA_deg)
         
         # Decompose Drag Force
         F_Dx = -F_D * math.cos(phi)
@@ -339,7 +354,7 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
         F_Lz = F_L * math.cos(phi)
         
         # Gravity Force
-        F_g = -mass * G  # Downward
+        F_g = -mass * tj.G  # Downward
         
         # Net Forces
         F_net_x = F_Dx + F_Lx
@@ -375,13 +390,89 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
             bp_arr.append(back_area * atm['pressure'] / (current_speed / a))
             t_arr.append(time_elapsed)
 
-            atm = get_atm(min(altitude, MAX_ALT))
-            temperature = atm['temperature']
-            a_speed = math.sqrt(GAMMA * R * temperature)
-            mach = current_speed / a_speed
             back_pressure = back_area * atm['pressure'] / mach
             
             print(f"Time: {time_elapsed:.3f}s, X: {x_position:.3f}m, Altitude: {altitude:.3f}m, Vx: {Vx:.3f}m/s, Vz: {Vz:.3f}m/s, Mach: {mach:.3f}, AoA: {AoA_deg:.2f}, Lift: {F_L:.3f}N, Drag: {F_D:.3f}N, Back Pressure: {back_pressure:.3f}N")
 
-def tj_cost_fcn(params):
-    pass
+def tj_cost_fcn(params, df, back_area):
+    """
+    Produces the cost function that will be used to maximize the horizontal distance traveled.
+
+    Parameters:
+        params (list): List of parameters to be optimized. These are the coefficients for the AoA function.
+        df (pd.DataFrame): DataFrame with columns ['mach', 'aoa', 'lift', 'drag']. Used for lift and drag interpolation.
+        back_area (float): Area of the back surface in m^2.
+    """
+
+    def cost_fcn(params):
+
+        MASS = 25
+        INITIAL_ALTITUDE = 40000
+        INITIAL_MACH = 10
+
+        print(f"Running AoA cost function with parameters: {params}")
+
+        # Create the AoA function
+        AoA_func = AoA_param(*params)
+
+        # Run the trajectory simulation
+        try:
+            x_dist = simulate_trajectory_final(MASS, INITIAL_ALTITUDE, INITIAL_MACH, df, back_area, angle_of_attack_func=AoA_func, timestep=0.25)
+        except Exception as e:
+            print(f"Error running trajectory simulation: {e}")
+            return 1e6  # Return a large value to indicate failure
+
+        # Return the negative of the horizontal distance traveled
+        print(f"Horizontal distance: {x_dist:.3f}m")
+        return -x_dist
+    
+    return cost_fcn
+
+def optimize_aoa(df, back_area):
+    """
+    Optimizes the AoA function to maximize the horizontal distance traveled.
+    Uses the Nelder-Mead algorithm for optimization.
+    
+    Parameters:
+        df (pd.DataFrame): DataFrame with columns ['mach', 'aoa', 'lift', 'drag']. Used for lift and drag interpolation.
+        back_area (float): Area of the back surface in m^2.
+
+    Returns:
+        result: The result object from the optimization.
+    """
+
+    # Initial guess for the parameters
+    a = 9
+    n = 0.3
+    b = 0.6
+    c = -2.3
+    d = -0.6
+    k = 0.005
+
+    initial_params = [a, b, c, d, n, k]
+
+    # Create the cost function
+    cost_fcn = tj_cost_fcn(initial_params, df, back_area)
+
+    print("Running AoA optimization...")
+
+    # Perform the optimization
+    result = minimize(
+        fun=cost_fcn,
+        x0=initial_params,
+        method='Nelder-Mead',
+        options={
+            'disp': True,
+            'maxiter': 10000,
+            'xatol': 1e-6,
+            }
+    )
+
+    # Extract the optimized parameters and distance
+    optimized_params = result.x
+    optimized_distance = -result.fun
+
+    print(f"Optimized parameters: {optimized_params}")
+    print(f"Optimized distance: {optimized_distance:.3f}m")
+
+    return result
