@@ -113,9 +113,9 @@ def run_cfd(vtk_filename, drag_loc = -5, lift_loc = -4):
 
         
         # Submit the CFD job using sbatch
-        submit_command = ["./champs+", "input.sdf", " > /dev/null"]
+        submit_command = ["./champs+", "input.sdf"]
         print("Gonna try to run: ", str(parent_dir), str(submit_command))
-        subprocess.run(submit_command, cwd=parent_dir, check=True)
+        subprocess.run(submit_command, cwd=parent_dir, check=True, stdout=subprocess.DEVNULL)
         
         print("CFD job submitted. Waiting for completion...")
 
@@ -358,7 +358,7 @@ if __name__ == "__main__":
         dimensions=space,                   # Search space
         acq_func="EI",                      # Acquisition function
         n_calls=1000,                       # Total number of evaluations
-        n_initial_points=10,                 # Initial random evaluations
+        n_initial_points=10,                # Initial random evaluations
         random_state=2,                     # Seed for reproducibility
         callback=[checkpoint_saver],        # Save progress
         noise="gaussian",                   # Assume somewhat noisy observations
