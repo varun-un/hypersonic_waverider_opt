@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -t 12:00:00
+#SBATCH -t 24:00:00
 #SBATCH -n 32
 #SBATCH --gpus=a100:1
 #SBATCH -p gpu
