@@ -13,4 +13,8 @@
 ###source ~/.bashrc
 ###source ~/switch-modules.x
 
-python3 main.py | tee ./output/trace.log
+module load python/3.10.10
+python -mvenv --system-site-packages ~/my-venv
+source ~/venv/bin/activate
+pip install -r requirements.txt
+python main.py | tee ./output/trace.log
