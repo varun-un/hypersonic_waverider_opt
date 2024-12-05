@@ -335,7 +335,7 @@ if __name__ == "__main__":
         Real(-2.0, 2.0, name='g'),
         Real(0.0, 5.0, name='h'),
         Real(0.0, 1.0, name='j'),
-        Real(0.01, 15.0, name='q'),          # non-zero to avoid q=0, s=0 singularity
+        Real(0.0, 15.0, name='q'),          # non-zero to avoid q=0, s=0 singularity
         Real(0.0, 6.0, name='s')
     ]
 
