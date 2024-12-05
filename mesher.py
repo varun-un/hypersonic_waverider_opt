@@ -283,7 +283,7 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
                     else:
                         right = cur + 1
 
-                faces.append((above, cur, right, distances[row_idx][i]))
+                faces.append((cur, above, right, distances[row_idx][i]))
 
                 i += 1
 
@@ -311,7 +311,7 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
                     else:
                         above = above_left + 1
 
-                faces.append((above_left, cur, above, distances[row_idx][i]))
+                faces.append((cur, above_left, above, distances[row_idx][i]))
 
                 j += 1      # okay to increment, since right-moving triangle condition is >=
 
@@ -330,7 +330,7 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
             idx += 1
             jdx += 1
         elif idx == len(points[0]) - 2 and jdx == len(points[0]) - 2:        # right corner
-            faces.append((jdx + total_points - 1, idx, idx + 1, dist))
+            faces.append((idx, jdx + total_points - 1, idx + 1, dist))
             idx += 1
             jdx += 1
             break
@@ -338,7 +338,7 @@ def generate_faces(points, a, c, f, g, h, i, j, q, s):
             faces.append((jdx + total_points, idx, jdx + total_points - 1, dist))
             jdx += 1
         elif jdx > idx:         # left down facing triangle
-            faces.append((jdx + total_points - 1, idx, idx + 1, dist))
+            faces.append((idx, jdx + total_points - 1, idx + 1, dist))
             idx += 1
 
     return faces, total_points, row_lengths
@@ -498,9 +498,9 @@ def main():
     # delayed import to avoid bloating opt script
     import pyvista as pv
 
-    mesh = pv.read("output.vtk")
+    # mesh = pv.read("output.vtk")
     # mesh.plot_normals(mag=0.1, color='black')
-    mesh.plot(show_edges=True)
+    # mesh.plot(show_edges=True)
 
 if __name__ == "__main__":
     main()
