@@ -460,11 +460,11 @@ def main():
     h = 0.0
     i = 0.12
     j = 0.0
-    q = 2
-    s = 1
+    q = 0
+    s = 3
 
-    dy = 0.05
-    initial_N = 22      # usually >= 1/dy + 2
+    dy = 0.005
+    initial_N = 202     # usually >= 1/dy + 2
     y_min = -1.0
     y_max = 0.0
     

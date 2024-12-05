@@ -5,12 +5,14 @@ alternative is scipy.optimize.minimize with COBYLA
 """
 
 import trajectory as tj
+import tj_opt
 from volume import find_x_bounds, analytical_volume, back_area
 from mesher import generate_mesh
 import numpy as np
 from skopt import gp_minimize       # BO w/ Gaussian Process & RBF
 from skopt.space import Real
 from skopt.callbacks import CheckpointSaver
+import pandas as pd
 
 import os
 import subprocess
@@ -294,9 +296,9 @@ def cost_fcn_partial(x):
     f = 0
 
     # spacing in the y direction for meshing
-    dy = 0.01
+    dy = 0.005
     # max number of mesh vertices in the y=-1 row
-    initial_N = 102
+    initial_N = 202
     # timestep for trajectory simulation
     timestep = 1
     # filename to save the VTK file to
@@ -367,5 +369,28 @@ if __name__ == "__main__":
     with open(f"{output_folder}/final_result.pkl", "wb") as file:
         dill.dump(result, file)
 
+    print("WE RAN THE SHAPE OPTIMIZATION!!!!")
 
-    print(result)
+    best_params = result.x
+
+    print(f"Best parameters: {best_params}")
+
+    # # Parameters for the final best shape evaluation
+    # dy = 0.002
+    # initial_N = 502
+    # timestep = 0.25
+    # filename = "../generated_waverider.vtk"
+
+    # # generate the best mesh
+    # a, c, g, h, j, q, s = best_params
+    # i = get_i(best_params)
+
+    # generate_mesh(a, c, f, g, h, i, j, q, s, dy, initial_N, filename)
+
+    # # do CFD sweep
+    # mach_range = (2, 10)
+    # mach_step = 0.5
+    # angle_range = (-10, 10)
+    # angle_step = 0.5
+
+    # df = tj_opt.sweep_cfd(mach_range, mach_step, angle_range, angle_step)
