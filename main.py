@@ -236,7 +236,7 @@ def cost_fcn(params, dy, initial_N, timestep = 1, filename="generated_waverider.
         return PENALTY
 
     # ------ Run CFD ------
-    lift, drag = run_cfd(filename)
+    lift, drag = run_cfdJ(filename)
     if lift == np.inf or drag == np.inf:
         return PENALTY
     
