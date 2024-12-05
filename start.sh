@@ -13,4 +13,4 @@
 ###source ~/.bashrc
 ###source ~/switch-modules.x
 
-python main.py | tee ./output/trace.log
+python3 main.py | tee ./output/trace.log
