@@ -330,13 +330,13 @@ if __name__ == "__main__":
 
     # Define the parameter space    (exclude f and i)
     space = [
-        Real(-1.0, 1.0, name='a'),
-        Real(-1.0, 1.0, name='c'),
-        Real(-1.0, 1.0, name='g'),
-        Real(0.0, 2.0, name='h'),
+        Real(-5.0, 5.0, name='a'),
+        Real(-4.0, 4.0, name='c'),
+        Real(-2.0, 2.0, name='g'),
+        Real(0.0, 5.0, name='h'),
         Real(0.0, 1.0, name='j'),
-        Real(0.0, 2.0, name='q'),
-        Real(1.0, 4.0, name='s')
+        Real(0.01, 15.0, name='q'),          # non-zero to avoid q=0, s=0 singularity
+        Real(0.0, 6.0, name='s')
     ]
 
     # check above for meshing parameters
