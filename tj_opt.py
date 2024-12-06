@@ -54,9 +54,9 @@ def run_cfd(drag_loc=-5, lift_loc=-4):
 
         
         # Submit the CFD job using sbatch
-        submit_command = ["./champs+", "input.sdf", " > /dev/null"]
+        submit_command = ["./champs+", "input.sdf"]
         print("Gonna try to run: ", str(parent_dir), str(submit_command))
-        subprocess.run(submit_command, cwd=parent_dir, check=True)
+        subprocess.run(submit_command, cwd=parent_dir, check=True, stdout=subprocess.DEVNULL)
         
         print("CFD job submitted. Waiting for completion...")
 
@@ -176,7 +176,7 @@ def sweep_cfd(mach_range, mach_interval, angle_range, angle_interval):
             if aoa >= 0:
                 aoa_str = str(aoa)
             else:
-                aoa_str = f"0.{float(aoa):02d}"
+                aoa_str = f"0.{str(aoa)}."
             sdf_content_modified = re.sub(
                 r'(?m)^\s*aoa\s*=\s*\d+(\.\d+)?',
                 f'aoa      = {aoa_str}',
@@ -195,7 +195,7 @@ def sweep_cfd(mach_range, mach_interval, angle_range, angle_interval):
             continue
 
         # Run the CFD simulation
-        lift, drag = run_cfd()
+        lift, drag = run_cfd(-2, -1)
 
         # Append the results
         results.append({'mach': mach, 'aoa': aoa, 'lift': lift, 'drag': drag})

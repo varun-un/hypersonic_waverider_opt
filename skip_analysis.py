@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-analyze_bo_checkpoint.py
+analysis.py
 
 A script to analyze scikit-optimize Bayesian Optimization checkpoint files.
 Extracts key metrics and generates informative plots to visualize optimization progress.
 
 Usage:
-    python analyze_bo_checkpoint.py --checkpoint_dir ./outputs --output_dir ./plots --skip_iterations 1
+    python analysis.py --checkpoint_dir ./outputs --output_dir ./plots --skip_iterations 1
 """
 
 import os
@@ -42,22 +42,38 @@ def find_checkpoint_files(checkpoint_dir, extension='.pkl'):
                 checkpoint_files.append(os.path.join(root, file))
     return checkpoint_files
 
-def load_checkpoint(checkpoint_file):
+def load_checkpoint(checkpoint_file, max_bytes_to_trim=10000, step=100):
     """
-    Load the checkpoint file using joblib.
+    Load the checkpoint file using dill. If the file is corrupted, attempt to load
+    as much as possible by trimming bytes from the end.
 
     Parameters:
         checkpoint_file (str): Path to the checkpoint file.
+        max_bytes_to_trim (int): Maximum number of bytes to remove from the end.
+        step (int): Number of bytes to remove in each step.
 
     Returns:
-        dict: Loaded checkpoint data.
+        dict: Loaded checkpoint data, possibly incomplete. Returns None if loading fails.
     """
     try:
-        data = joblib.load(checkpoint_file)
+        with open(checkpoint_file, 'rb') as f:
+            data = f.read()
+        obj = dill.loads(data)
         print(f"Successfully loaded checkpoint file: {checkpoint_file}")
-        return data
-    except Exception as e:
+        return obj
+    except (EOFError, dill.UnpicklingError, AttributeError, ValueError) as e:
         print(f"Error loading checkpoint file {checkpoint_file}: {e}")
+        print("Attempting to load partial checkpoint by adding fake bytes...")
+        
+        for trim in range(step, max_bytes_to_trim + step, step):
+            try:
+                partial_data = data[:-trim]
+                obj = dill.loads(partial_data)
+                print(f"Successfully loaded partial checkpoint by trimming {trim} bytes.")
+                return obj
+            except (EOFError, dill.UnpicklingError, AttributeError, ValueError) as e_partial:
+                continue  # Continue trimming
+        print(f"Failed to load checkpoint file {checkpoint_file} even after trimming {max_bytes_to_trim} bytes.")
         return None
 
 def extract_metrics(checkpoint_data, penalty_threshold=1e5, skip_iterations=1):
@@ -402,6 +418,7 @@ def main():
         print(f"\nAnalyzing checkpoint file: {checkpoint_file}")
         data = load_checkpoint(checkpoint_file)
         if data is None:
+            print("Skipping this checkpoint due to loading failure.")
             continue
 
         metrics = extract_metrics(data, penalty_threshold=penalty_threshold, skip_iterations=skip_iterations)
@@ -430,8 +447,12 @@ def main():
             print(f"final_result.pkl not found in {checkpoint_dir}. Skipping uncertainty plot.")
             final_result = None
         else:
-            with open(final_result_pth, 'rb') as f:
-                final_result = dill.load(f)
+            try:
+                with open(final_result_pth, 'rb') as f:
+                    final_result = dill.load(f)
+            except Exception as e:
+                print(f"Error loading final_result.pkl: {e}")
+                final_result = None
 
         # Generate and save plots
         if output_dir:
@@ -468,4 +489,4 @@ def main():
 if __name__ == "__main__":
     main()
     # Example usage:
-    # python skip_analysis.py --checkpoint_dir ./output/1733127546 --output_dir ./plots --skip_iterations 1
+    # python skip_analysis.py --checkpoint_dir ./output/1733412039 --output_dir ./plots --skip_iterations 1

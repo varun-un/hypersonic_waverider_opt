@@ -59,7 +59,7 @@ def load_checkpoint(checkpoint_file):
         return data
     except Exception as e:
         print(f"Error loading checkpoint file {checkpoint_file}: {e}")
-        return None
+        raise e
 
 def extract_metrics(checkpoint_data, penalty_threshold=1e5):
     """
