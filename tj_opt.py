@@ -339,7 +339,7 @@ def simulate_trajectory_final(mass, initial_altitude, initial_mach, df, back_are
         # Get lift and drag forces
 
         # if subsonic, let it be in free fall
-        if mach < 1:
+        if mach < 1.5:
             F_L = 0
             F_D = 0
         else:

@@ -453,18 +453,18 @@ def generate_mesh(a, c, f, g, h, i, j, q, s, dy, initial_N, filename):
 
 def main():
 
-    a = -0.3
+    a = 0
     c = 0.0
     f = 0
-    g = 0.0
+    g = -0.8
     h = 0.0
-    i = 0.12
+    i = 0.088
     j = 0.0
     q = 0
-    s = 3
+    s = 2.2
 
-    dy = 0.005
-    initial_N = 202     # usually >= 1/dy + 2
+    dy = 0.01
+    initial_N = 102     # usually >= 1/dy + 2
     y_min = -1.0
     y_max = 0.0
     
