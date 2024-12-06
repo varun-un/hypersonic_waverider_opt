@@ -199,6 +199,7 @@ def sweep_cfd(mach_range, mach_interval, angle_range, angle_interval):
 
         # Append the results
         results.append({'mach': mach, 'aoa': aoa, 'lift': lift, 'drag': drag})
+        print(f"Results: Lift={lift}, Drag={drag}, Mach={mach}, AoA={aoa}")
 
     # Restore the original input.sdf
     try:
