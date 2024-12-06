@@ -259,13 +259,13 @@ def AoA_param(a, b, c, d, n, k):
     """
     Creates a function that returns the angle of attack (in degrees) as a function of x.
     To avoid saturation with small optimized coefficients, x will be in kilometers.
-    This function will be clamped to -10 and 10 degrees.
+    This function will be clamped to -8 and 8 degrees.
 
     a, b, c, d, n, k: Coefficients defining the angle of attack function. It's a damping sine wave.
     """
     def aoa(x):
         val = a / (x - c)**n * np.cos(b * (x - c)) + k * (x - c) + d
-        return np.clip(val, -10, 10)
+        return np.clip(val, -8, 8)
     
     return aoa
 
@@ -311,6 +311,7 @@ def simulate_trajectory_final(mass, initial_altitude, initial_mach, df, back_are
     Vz = speed * math.sin(0.0)
     
     time_elapsed = 0.0  
+    freefall = False  # Flag to indicate if the glider is in free fall
     
     while altitude > 0:
         # Prevent glider from orbiting indefinitely
@@ -341,10 +342,13 @@ def simulate_trajectory_final(mass, initial_altitude, initial_mach, df, back_are
 
         # if subsonic, let it be in free fall
         if mach < 1.5:
+            freefall = True
+
+        if not freefall:
+            F_L, F_D = interpolate_lift_drag(df, mach, AoA_deg)
+        else:
             F_L = 0
             F_D = 0
-        else:
-            F_L, F_D = interpolate_lift_drag(df, mach, AoA_deg)
         
         # Decompose Drag Force
         F_Dx = -F_D * math.cos(phi)
@@ -418,7 +422,7 @@ def tj_cost_fcn(params, df, back_area):
 
         # Run the trajectory simulation
         try:
-            x_dist = simulate_trajectory_final(MASS, INITIAL_ALTITUDE, INITIAL_MACH, df, back_area, angle_of_attack_func=AoA_func, timestep=0.25)
+            x_dist = simulate_trajectory_final(MASS, INITIAL_ALTITUDE, INITIAL_MACH, df, back_area, angle_of_attack_func=AoA_func, timestep=1)
         except Exception as e:
             print(f"Error running trajectory simulation: {e}")
             return 1e6  # Return a large value to indicate failure

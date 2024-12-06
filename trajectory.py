@@ -204,6 +204,7 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
     Vz = speed * math.sin(0.0)
     
     time_elapsed = 0.0  
+    freefall = False
     
     while altitude > 0:
         # Prevent glider from orbiting indefinitely
@@ -213,8 +214,19 @@ def simulate_trajectory(mass, initial_altitude, initial_mach, geometry_length, S
 
         current_speed = math.sqrt(Vx**2 + Vz**2)  # Relative speed
         
-        # Get lift and drag forces
-        F_L, F_D = get_lift_drag(current_speed, min(altitude, MAX_ALT), geometry_length, S, back_area, **kwargs)
+        atm = get_atm(min(altitude, MAX_ALT))
+        a = math.sqrt(GAMMA * R * atm['temperature'])
+        mach = current_speed / a
+
+        if mach < 2.6:
+            freefall = True
+
+        if not freefall:
+            # Get lift and drag forces
+            F_L, F_D = get_lift_drag(current_speed, min(altitude, MAX_ALT), geometry_length, S, back_area, **kwargs)
+        else:
+            F_L = 0
+            F_D = 0
         
         # Determine Angle of Attack
         if angle_of_attack_func is not None:
@@ -320,8 +332,8 @@ def single_shot():
     timestep = 1          # seconds
 
     # using first case Duncan ran
-    lift = 794.6*2
-    drag = 90.3*2
+    lift = 774.9*2
+    drag = 87.25*2
     print(f"Using Lift: {lift:.3f}, Drag: {drag:.3f}")
 
     atm = get_atm(30000)

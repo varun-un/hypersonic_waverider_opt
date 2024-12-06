@@ -29,9 +29,9 @@ best_vtk = f"{output_folder}/best_waverider.vtk"
 generate_mesh(a, c, f, g, h, i, j, q, s, dy, initial_N, best_vtk)
 
 # do CFD sweep
-mach_range = (2, 10)
+mach_range = (2, 8)
 mach_step = 1
-angle_range = (-10, 10)
+angle_range = (-8, 8)
 angle_step = 2
 
 try:
